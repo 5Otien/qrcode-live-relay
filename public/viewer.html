@@ -3,255 +3,218 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Live Viewer</title>
+  <title>QR Watch - Live</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(to bottom right, #1e3a8a, #7c3aed);
       min-height: 100vh;
       color: white;
-      display: flex;
-      flex-direction: column;
-    }
-    header {
-      background: rgba(0,0,0,0.3);
       padding: 20px;
-      text-align: center;
     }
-    h1 { font-size: 2rem; margin-bottom: 10px; }
-    .status-badge {
+    .container { max-width: 800px; margin: 0 auto; }
+    .header {
+      text-align: center;
+      padding: 30px 0;
+      border-bottom: 2px solid rgba(255,255,255,0.2);
+    }
+    h1 { font-size: 2.5rem; margin: 0 0 15px; }
+    .conn-status {
       display: inline-block;
-      padding: 5px 15px;
-      background: rgba(255,255,255,0.2);
+      padding: 8px 20px;
+      border-radius: 25px;
+      background: #dc2626;
+      font-size: 0.9rem;
+    }
+    .conn-status.ok { background: #16a34a; }
+    .display-zone {
+      margin: 40px 0;
+      background: rgba(255,255,255,0.1);
       border-radius: 20px;
-      font-size: 0.85rem;
-    }
-    .status-badge.online { background: rgba(16, 185, 129, 0.5); }
-    main {
-      flex: 1;
-      padding: 30px;
-      max-width: 900px;
-      margin: 0 auto;
-      width: 100%;
-    }
-    .qr-display {
-      background: rgba(255,255,255,0.15);
-      padding: 40px;
-      border-radius: 20px;
-      text-align: center;
-      backdrop-filter: blur(15px);
-      margin-bottom: 30px;
-    }
-    .waiting-msg {
-      font-size: 1.8rem;
-      opacity: 0.7;
       padding: 50px;
+      text-align: center;
+      backdrop-filter: blur(10px);
     }
-    .qr-content { display: none; }
-    .qr-content.active { display: block; }
-    #qr-img {
-      display: block;
-      margin: 20px auto;
+    .wait-text {
+      font-size: 2rem;
+      opacity: 0.6;
+      padding: 40px;
+    }
+    .qr-zone { display: none; }
+    .qr-zone.show { display: block; }
+    #qr-display {
       background: white;
-      padding: 25px;
+      padding: 30px;
       border-radius: 15px;
-      max-width: 350px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      display: inline-block;
+      margin: 20px auto;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
     }
-    .qr-text {
-      background: rgba(0,0,0,0.4);
-      padding: 20px;
+    .qr-data {
+      background: rgba(0,0,0,0.3);
+      padding: 25px;
       border-radius: 12px;
-      margin: 20px 0;
-      word-wrap: break-word;
-      font-family: 'Courier New', monospace;
-      font-size: 1.05rem;
+      margin: 25px 0;
+      font-family: monospace;
+      font-size: 1.1rem;
+      word-break: break-all;
     }
-    .qr-metadata {
+    .info-pills {
       display: flex;
-      gap: 20px;
+      gap: 15px;
       justify-content: center;
       flex-wrap: wrap;
       margin-top: 20px;
     }
-    .meta-badge {
-      background: rgba(255,255,255,0.15);
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-size: 0.95rem;
+    .pill {
+      background: rgba(255,255,255,0.2);
+      padding: 10px 20px;
+      border-radius: 20px;
     }
-    .stats-grid {
+    .metrics {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap: 20px;
-      margin-bottom: 30px;
+      margin: 30px 0;
     }
-    .stat-card {
-      background: rgba(255,255,255,0.15);
-      padding: 25px;
+    .metric-box {
+      background: rgba(255,255,255,0.1);
+      padding: 30px;
       border-radius: 15px;
       text-align: center;
     }
-    .stat-number {
-      font-size: 3rem;
+    .metric-val {
+      font-size: 3.5rem;
       font-weight: bold;
       display: block;
-      margin-bottom: 5px;
     }
-    .stat-label {
-      opacity: 0.85;
-      font-size: 0.95rem;
+    .metric-lbl {
+      opacity: 0.8;
+      margin-top: 10px;
     }
-    .history-section {
-      background: rgba(255,255,255,0.15);
-      padding: 25px;
+    .log {
+      background: rgba(0,0,0,0.3);
+      padding: 20px;
       border-radius: 15px;
-      max-height: 350px;
+      max-height: 300px;
       overflow-y: auto;
-    }
-    .history-section h2 {
-      margin-bottom: 20px;
-      font-size: 1.4rem;
-    }
-    .history-entry {
-      background: rgba(0,0,0,0.25);
-      padding: 12px;
-      border-radius: 10px;
-      margin-bottom: 12px;
       font-size: 0.9rem;
     }
-    .back-link {
+    .log-item {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .home-btn {
       display: inline-block;
-      margin-top: 25px;
-      padding: 12px 25px;
+      margin: 30px auto;
+      padding: 15px 30px;
       background: rgba(255,255,255,0.2);
       color: white;
       text-decoration: none;
       border-radius: 10px;
-      transition: all 0.3s;
     }
-    .back-link:hover {
-      background: rgba(255,255,255,0.3);
-      transform: translateY(-2px);
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .animate-in { animation: fadeIn 0.5s ease; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>👁️ QR Code Viewer - Live</h1>
-    <span class="status-badge" id="status">⏳ Connexion...</span>
-  </header>
+  <div class="container">
+    <div class="header">
+      <h1>👁️ QR Watch</h1>
+      <span class="conn-status" id="conn">● Offline</span>
+    </div>
 
-  <main>
-    <div class="qr-display">
-      <div class="waiting-msg" id="waiting">
-        🎯 En attente d'un scan...
-      </div>
-      <div class="qr-content" id="content">
-        <h2>📱 QR Code Reçu</h2>
-        <img id="qr-img" alt="QR Code">
-        <div class="qr-text" id="qr-text"></div>
-        <div class="qr-metadata">
-          <div class="meta-badge">
-            🕒 <strong id="qr-time">--:--</strong>
-          </div>
-          <div class="meta-badge">
-            #️⃣ Scan <strong id="qr-num">-</strong>
-          </div>
+    <div class="display-zone">
+      <div class="wait-text" id="wait">⏳ En attente...</div>
+      <div class="qr-zone" id="qr-zone">
+        <h2>📱 QR Code Live</h2>
+        <div id="qr-display"></div>
+        <div class="qr-data" id="qr-data"></div>
+        <div class="info-pills">
+          <div class="pill">🕒 <span id="time">--:--</span></div>
+          <div class="pill">#<span id="num">0</span></div>
         </div>
       </div>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <span class="stat-number" id="total">0</span>
-        <span class="stat-label">Total Scans</span>
+    <div class="metrics">
+      <div class="metric-box">
+        <span class="metric-val" id="scans">0</span>
+        <div class="metric-lbl">Scans totaux</div>
       </div>
-      <div class="stat-card">
-        <span class="stat-number" id="viewers">0</span>
-        <span class="stat-label">Viewers</span>
-      </div>
-    </div>
-
-    <div class="history-section">
-      <h2>📜 Historique</h2>
-      <div id="history">
-        <div style="text-align:center;opacity:0.6;">Aucun scan</div>
+      <div class="metric-box">
+        <span class="metric-val" id="users">0</span>
+        <div class="metric-lbl">Utilisateurs</div>
       </div>
     </div>
 
-    <a href="/" class="back-link">← Accueil</a>
-  </main>
+    <div class="log" id="log">
+      <div style="text-align:center;opacity:0.5;">Historique vide</div>
+    </div>
+
+    <center><a href="/" class="home-btn">← Accueil</a></center>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
   <script>
-    // ===== NOUVELLE VERSION COMPLETE =====
-    const ws = io();
-    const historyData = [];
-    const MAX_HISTORY = 25;
+    const connection = io();
+    const logs = [];
 
-    // Connexion
-    ws.on('connect', () => {
-      document.getElementById('status').textContent = '🟢 Connecté';
-      document.getElementById('status').classList.add('online');
+    connection.on('connect', () => {
+      document.getElementById('conn').textContent = '● Online';
+      document.getElementById('conn').classList.add('ok');
     });
 
-    ws.on('disconnect', () => {
-      document.getElementById('status').textContent = '🔴 Déconnecté';
-      document.getElementById('status').classList.remove('online');
+    connection.on('disconnect', () => {
+      document.getElementById('conn').textContent = '● Offline';
+      document.getElementById('conn').classList.remove('ok');
     });
 
-    // Stats
-    ws.on('stats-update', (s) => {
-      document.getElementById('total').textContent = s.scanCount;
-      document.getElementById('viewers').textContent = s.connectedClients;
+    connection.on('stats-update', s => {
+      document.getElementById('scans').textContent = s.scanCount;
+      document.getElementById('users').textContent = s.connectedClients;
     });
 
-    // QR reçu
-    ws.on('qr-live', (d) => {
-      console.log('✅ QR reçu:', d);
-      showQR(d);
-      saveHistory(d);
+    connection.on('qr-live', qr => {
+      console.log('QR:', qr);
+      renderQR(qr);
+      addLog(qr);
     });
 
-    function showQR(data) {
-      document.getElementById('waiting').style.display = 'none';
+    function renderQR(qr) {
+      document.getElementById('wait').style.display = 'none';
+      document.getElementById('qr-zone').classList.add('show');
 
-      const content = document.getElementById('content');
-      content.classList.add('active');
-      content.classList.add('animate-in');
+      // Clear previous QR
+      const container = document.getElementById('qr-display');
+      container.innerHTML = '';
 
-      // Générer QR via API
-      const encoded = encodeURIComponent(data.value);
-      const img = document.getElementById('qr-img');
-      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encoded}`;
-      img.style.display = 'block';
+      // Generate new QR using QRCode.js
+      new QRCode(container, {
+        text: qr.value,
+        width: 300,
+        height: 300,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
 
-      // Texte et metadata
-      document.getElementById('qr-text').textContent = data.value;
-      document.getElementById('qr-time').textContent = new Date(data.timestamp).toLocaleTimeString();
-      document.getElementById('qr-num').textContent = data.scanNumber || '-';
+      document.getElementById('qr-data').textContent = qr.value;
+      document.getElementById('time').textContent = new Date(qr.timestamp).toLocaleTimeString();
+      document.getElementById('num').textContent = qr.scanNumber || '?';
     }
 
-    function saveHistory(data) {
-      historyData.unshift(data);
-      if (historyData.length > MAX_HISTORY) historyData.pop();
+    function addLog(qr) {
+      logs.unshift(qr);
+      if (logs.length > 20) logs.pop();
 
-      const html = historyData.map((item, i) => `
-        <div class="history-entry">
-          <strong>#${item.scanNumber || (historyData.length - i)}</strong> -
-          ${new Date(item.timestamp).toLocaleString()} -
-          <code>${item.value.substring(0, 60)}${item.value.length > 60 ? '...' : ''}</code>
+      const html = logs.map(l => `
+        <div class="log-item">
+          #${l.scanNumber} - ${new Date(l.timestamp).toLocaleString()} - ${l.value.substring(0, 50)}
         </div>
       `).join('');
 
-      document.getElementById('history').innerHTML = html;
+      document.getElementById('log').innerHTML = html;
     }
   </script>
 </body>
