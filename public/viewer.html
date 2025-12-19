@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viewer - QRCode Live Relay</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      min-height: 100vh;
+      color: white;
+    }
+
+    .header {
+      padding: 20px;
+      text-align: center;
+      background: rgba(0,0,0,0.2);
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .status.connected {
+      background: rgba(16, 185, 129, 0.3);
+    }
+
+    .main {
+      padding: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .live-display {
+      background: rgba(255,255,255,0.1);
+      padding: 30px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+      margin: 20px 0;
+      text-align: center;
+    }
+
+    .waiting {
+      padding: 60px;
+      font-size: 1.5rem;
+      opacity: 0.6;
+    }
+
+    #qr-canvas {
+      margin: 20px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .qr-info {
+      margin-top: 20px;
+    }
+
+    .qr-value {
+      background: rgba(0,0,0,0.3);
+      padding: 20px;
+      border-radius: 10px;
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 1.1rem;
+      margin: 15px 0;
+    }
+
+    .qr-meta {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+
+    .meta-item {
+      background: rgba(255,255,255,0.1);
+      padding: 10px 20px;
+      border-radius: 8px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .stat-box {
+      flex: 1;
+      min-width: 150px;
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-box .number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      display: block;
+    }
+
+    .stat-box .label {
+      font-size: 1rem;
+      opacity: 0.8;
+      margin-top: 5px;
+    }
+
+    .history {
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 15px;
+      margin-top: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .history h2 {
+      margin-bottom: 15px;
+    }
+
+    .history-item {
+      background: rgba(0,0,0,0.2);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+
+    .btn-back {
+      display: inline-block;
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .btn-back:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .pulse {
+      animation: pulse 1.5s ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>👀 Viewer - Live QR Display</h1>
+    <div class="status" id="connection-status">🔴 Connexion...</div>
+  </div>
+
+  <div class="main">
+    <div class="live-display" id="live-display">
+      <div class="waiting" id="waiting">
+        🎯 En attente d'un QR code...
+      </div>
+      <canvas id="qr-canvas"></canvas>
+      <div class="qr-info" id="qr-info" style="display:none;">
+        <h2>📱 QR Code reçu</h2>
+        <div class="qr-value" id="qr-value"></div>
+        <div class="qr-meta">
+          <div class="meta-item">
+            <strong>🕐 Heure:</strong>
+            <span id="qr-time"></span>
+          </div>
+          <div class="meta-item">
+            <strong>#️⃣ Scan:</strong>
+            <span id="scan-number"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <span class="number" id="total-scans">0</span>
+        <span class="label">Total Scans</span>
+      </div>
+      <div class="stat-box">
+        <span class="number" id="connected-clients">0</span>
+        <span class="label">Viewers connectés</span>
+      </div>
+    </div>
+
+    <div class="history">
+      <h2>📜 Historique des scans</h2>
+      <div id="history-list">
+        <div style="text-align: center; opacity: 0.6;">Aucun scan pour le moment</div>
+      </div>
+    </div>
+
+    <a href="/" class="btn-back">← Retour</a>
+  </div>
+
+  <script>
+    const socket = io();
+    const history = [];
+    const MAX_HISTORY = 20;
+
+    // Connexion WebSocket
+    socket.on('connect', () => {
+      const statusEl = document.getElementById('connection-status');
+      statusEl.textContent = '🟢 Connecté';
+      statusEl.classList.add('connected');
+    });
+
+    socket.on('disconnect', () => {
+      const statusEl = document.getElementById('connection-status');
+      statusEl.textContent = '🔴 Déconnecté';
+      statusEl.classList.remove('connected');
+    });
+
+    // Mise à jour des stats
+    socket.on('stats-update', (stats) => {
+      document.getElementById('total-scans').textContent = stats.scanCount;
+      document.getElementById('connected-clients').textContent = stats.connectedClients;
+    });
+
+    // Réception d'un QR code
+    socket.on('qr-live', (data) => {
+      console.log('📱 QR reçu:', data);
+
+      // Masquer le message d'attente
+      document.getElementById('waiting').style.display = 'none';
+
+      // Afficher le QR code
+      displayQRCode(data);
+
+      // Ajouter à l'historique
+      addToHistory(data);
+
+      // Animation pulse
+      document.getElementById('live-display').classList.add('pulse');
+      setTimeout(() => {
+        document.getElementById('live-display').classList.remove('pulse');
+      }, 1500);
+    });
+
+    function displayQRCode(data) {
+      const canvas = document.getElementById('qr-canvas');
+      const qrInfo = document.getElementById('qr-info');
+
+      // Générer le QR code
+      QRCode.toCanvas(canvas, data.value, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+
+      canvas.style.display = 'block';
+      qrInfo.style.display = 'block';
+
+      // Afficher les infos
+      document.getElementById('qr-value').textContent = data.value;
+      document.getElementById('qr-time').textContent = new Date(data.timestamp).toLocaleTimeString();
+      document.getElementById('scan-number').textContent = data.scanNumber || '-';
+    }
+
+    function addToHistory(data) {
+      history.unshift(data);
+      if (history.length > MAX_HISTORY) {
+        history.pop();
+      }
+
+      const historyList = document.getElementById('history-list');
+      historyList.innerHTML = history.map((item, index) => `
+        <div class="history-item">
+          <strong>#${item.scanNumber || (history.length - index)}</strong> -
+          ${new Date(item.timestamp).toLocaleString()} -
+          <code>${truncate(item.value, 50)}</code>
+        </div>
+      `).join('');
+    }
+
+    function truncate(str, len) {
+      return str.length > len ? str.substring(0, len) + '...' : str;
+    }
+  </script>
+</body>
+</html>

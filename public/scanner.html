@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner - QRCode Live Relay</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      min-height: 100vh;
+      color: white;
+    }
+
+    .header {
+      padding: 20px;
+      text-align: center;
+      background: rgba(0,0,0,0.2);
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .status.connected {
+      background: rgba(16, 185, 129, 0.3);
+    }
+
+    .main {
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    #reader {
+      border-radius: 15px;
+      overflow: hidden;
+      margin: 20px 0;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .last-scan {
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 15px;
+      margin-top: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .last-scan h2 {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    .qr-value {
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 10px;
+      word-break: break-all;
+      font-family: monospace;
+      margin-top: 10px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .stat-box {
+      flex: 1;
+      min-width: 120px;
+      background: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-box .number {
+      font-size: 2rem;
+      font-weight: bold;
+      display: block;
+    }
+
+    .stat-box .label {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .btn-back {
+      display: inline-block;
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .btn-back:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .scanning-indicator {
+      text-align: center;
+      padding: 15px;
+      background: rgba(16, 185, 129, 0.3);
+      border-radius: 10px;
+      margin-top: 10px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📸 Scanner QR Code</h1>
+    <div class="status" id="connection-status">🔴 Connexion...</div>
+  </div>
+
+  <div class="main">
+    <div id="reader"></div>
+    <div class="scanning-indicator" id="scanning-indicator" style="display:none;">
+      🔍 En attente d'un QR code...
+    </div>
+
+    <div class="last-scan" id="last-scan" style="display:none;">
+      <h2>✅ Dernier scan diffusé</h2>
+      <div class="qr-value" id="qr-value"></div>
+      <div id="timestamp"></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <span class="number" id="scan-count">0</span>
+        <span class="label">Scans</span>
+      </div>
+      <div class="stat-box">
+        <span class="number" id="connected-clients">0</span>
+        <span class="label">Connectés</span>
+      </div>
+    </div>
+
+    <a href="/" class="btn-back">← Retour</a>
+  </div>
+
+  <script>
+    const socket = io();
+    let html5QrCode;
+    let isScanning = false;
+    let scanTimeout = null;
+
+    // Connexion WebSocket
+    socket.on('connect', () => {
+      const statusEl = document.getElementById('connection-status');
+      statusEl.textContent = '🟢 Connecté';
+      statusEl.classList.add('connected');
+    });
+
+    socket.on('disconnect', () => {
+      const statusEl = document.getElementById('connection-status');
+      statusEl.textContent = '🔴 Déconnecté';
+      statusEl.classList.remove('connected');
+    });
+
+    // Mise à jour des stats
+    socket.on('stats-update', (stats) => {
+      document.getElementById('scan-count').textContent = stats.scanCount;
+      document.getElementById('connected-clients').textContent = stats.connectedClients;
+    });
+
+    // Callback quand un QR est scanné
+    function onScanSuccess(decodedText, decodedResult) {
+      if (isScanning) return;
+
+      isScanning = true;
+      document.getElementById('scanning-indicator').style.display = 'none';
+
+      // Afficher le scan
+      document.getElementById('last-scan').style.display = 'block';
+      document.getElementById('qr-value').textContent = decodedText;
+      document.getElementById('timestamp').textContent = new Date().toLocaleString();
+
+      // Envoyer au serveur
+      socket.emit('qr-scanned', {
+        value: decodedText,
+        timestamp: Date.now()
+      });
+
+      console.log('📱 QR scanné et envoyé:', decodedText);
+
+      // Débloquer après 2 secondes (anti-spam)
+      clearTimeout(scanTimeout);
+      scanTimeout = setTimeout(() => {
+        isScanning = false;
+        document.getElementById('scanning-indicator').style.display = 'block';
+      }, 2000);
+    }
+
+    function onScanError(errorMessage) {
+      // Ignorer les erreurs normales de scan
+    }
+
+    // Démarrer le scanner
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+    Html5Qrcode.getCameras().then(cameras => {
+      if (cameras && cameras.length) {
+        html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          onScanSuccess,
+          onScanError
+        ).then(() => {
+          document.getElementById('scanning-indicator').style.display = 'block';
+          console.log('✅ Scanner démarré');
+        });
+      }
+    }).catch(err => {
+      console.error('❌ Erreur caméra:', err);
+      alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
+    });
+
+    // Arrêter le scanner à la fermeture
+    window.addEventListener('beforeunload', () => {
+      if (html5QrCode) {
+        html5QrCode.stop();
+      }
+    });
+  </script>
+</body>
+</html>
