@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Viewer - QRCode Live Relay</title>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -222,7 +220,14 @@
     <a href="/" class="btn-back">← Retour</a>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script>
+    // Attendre que tout soit chargé
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('QRCode lib loaded:', typeof QRCode !== 'undefined');
+    });
+
     const socket = io();
     const history = [];
     const MAX_HISTORY = 20;
@@ -270,17 +275,32 @@
       const canvas = document.getElementById('qr-canvas');
       const qrInfo = document.getElementById('qr-info');
 
-      // Générer le QR code
-      QRCode.toCanvas(canvas, data.value, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
-        }
-      });
+      console.log('Génération du QR code pour:', data.value);
 
-      canvas.style.display = 'block';
+      // Générer le QR code
+      if (typeof QRCode !== 'undefined') {
+        QRCode.toCanvas(canvas, data.value, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          }
+        }, function(error) {
+          if (error) {
+            console.error('Erreur génération QR:', error);
+            // Afficher quand même les infos texte
+            canvas.style.display = 'none';
+          } else {
+            console.log('QR code généré avec succès');
+            canvas.style.display = 'block';
+          }
+        });
+      } else {
+        console.error('Bibliothèque QRCode non chargée');
+        canvas.style.display = 'none';
+      }
+
       qrInfo.style.display = 'block';
 
       // Afficher les infos
