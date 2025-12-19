@@ -62,12 +62,15 @@
       opacity: 0.6;
     }
 
-    #qr-canvas {
+    #qr-image {
       margin: 20px auto;
+      display: block;
       background: white;
       padding: 20px;
       border-radius: 10px;
-      display: none;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+      max-width: 350px;
+      width: 100%;
     }
 
     .qr-info {
@@ -182,9 +185,9 @@
       <div class="waiting" id="waiting">
         🎯 En attente d'un QR code...
       </div>
-      <img id="qr-image" style="display:none; max-width: 300px; background: white; padding: 20px; border-radius: 10px; margin: 20px auto;" alt="QR Code">
       <div class="qr-info" id="qr-info" style="display:none;">
-        <h2>📱 QR Code reçu</h2>
+        <h2>📱 QR Code Scanné</h2>
+        <img id="qr-image" style="display:none;" alt="QR Code">
         <div class="qr-value" id="qr-value"></div>
         <div class="qr-meta">
           <div class="meta-item">
