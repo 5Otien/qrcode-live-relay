@@ -182,7 +182,7 @@
       <div class="waiting" id="waiting">
         🎯 En attente d'un QR code...
       </div>
-      <canvas id="qr-canvas"></canvas>
+      <img id="qr-image" style="display:none; max-width: 300px; background: white; padding: 20px; border-radius: 10px; margin: 20px auto;" alt="QR Code">
       <div class="qr-info" id="qr-info" style="display:none;">
         <h2>📱 QR Code reçu</h2>
         <div class="qr-value" id="qr-value"></div>
@@ -221,13 +221,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script>
-    // Attendre que tout soit chargé
-    window.addEventListener('DOMContentLoaded', () => {
-      console.log('QRCode lib loaded:', typeof QRCode !== 'undefined');
-    });
-
     const socket = io();
     const history = [];
     const MAX_HISTORY = 20;
@@ -272,34 +266,17 @@
     });
 
     function displayQRCode(data) {
-      const canvas = document.getElementById('qr-canvas');
+      const qrImage = document.getElementById('qr-image');
       const qrInfo = document.getElementById('qr-info');
 
       console.log('Génération du QR code pour:', data.value);
 
-      // Générer le QR code
-      if (typeof QRCode !== 'undefined') {
-        QRCode.toCanvas(canvas, data.value, {
-          width: 300,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#ffffff'
-          }
-        }, function(error) {
-          if (error) {
-            console.error('Erreur génération QR:', error);
-            // Afficher quand même les infos texte
-            canvas.style.display = 'none';
-          } else {
-            console.log('QR code généré avec succès');
-            canvas.style.display = 'block';
-          }
-        });
-      } else {
-        console.error('Bibliothèque QRCode non chargée');
-        canvas.style.display = 'none';
-      }
+      // Générer le QR code via API
+      const qrValue = encodeURIComponent(data.value);
+      qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qrValue}`;
+      qrImage.style.display = 'block';
+
+      console.log('QR code généré avec succès');
 
       qrInfo.style.display = 'block';
 
