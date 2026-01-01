@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner QR</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: white;
+    }
+    .header {
+      padding: 15px;
+      background: #111;
+      text-align: center;
+      border-bottom: 2px solid #0f0;
+    }
+    h1 { color: #0f0; font-size: 1.5rem; }
+    .status {
+      display: inline-block;
+      padding: 5px 15px;
+      background: #f00;
+      border-radius: 15px;
+      margin-top: 10px;
+      font-size: 0.9rem;
+    }
+    .status.ok { background: #0f0; color: #000; }
+    .container { padding: 15px; }
+    #video {
+      width: 100%;
+      border: 3px solid #0f0;
+      border-radius: 10px;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 15px;
+      background: #222;
+      border-radius: 10px;
+      border: 2px solid #0f0;
+      display: none;
+    }
+    .result.show { display: block; }
+    .qr-data {
+      background: #000;
+      padding: 10px;
+      border-radius: 5px;
+      word-break: break-all;
+      font-family: monospace;
+      margin-top: 10px;
+      color: #0f0;
+    }
+    .stats {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .stat {
+      flex: 1;
+      background: #222;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #333;
+    }
+    .stat-val {
+      display: block;
+      font-size: 1.5rem;
+      color: #0f0;
+      font-weight: bold;
+    }
+    .stat-lbl {
+      font-size: 0.8rem;
+      opacity: 0.7;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      background: #0f0;
+      color: #000;
+      text-decoration: none;
+      text-align: center;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎯 SCANNER QR</h1>
+    <div class="status" id="status">⚫ Init...</div>
+  </div>
+
+  <div class="container">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div class="result" id="result">
+      <h3>✅ DÉTECTÉ</h3>
+      <div class="qr-data" id="data"></div>
+      <div style="margin-top:8px;font-size:0.8rem;opacity:0.7;" id="time"></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val" id="fps">0</span>
+        <span class="stat-lbl">FPS</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val" id="found">0</span>
+        <span class="stat-lbl">TROUVÉS</span>
+      </div>
+    </div>
+
+    <a href="/" class="btn">← RETOUR</a>
+  </div>
+
+  <script>
+    const socket = io();
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let running = true;
+    let lastQR = null;
+    let cooldown = 1500;
+    let found = 0;
+    let fps = 0;
+    let fpsCount = 0;
+    let fpsTime = Date.now();
+
+    // Socket
+    socket.on('connect', () => {
+      document.getElementById('status').textContent = '🟢 OK';
+      document.getElementById('status').classList.add('ok');
+    });
+
+    socket.on('disconnect', () => {
+      document.getElementById('status').textContent = '🔴 OFF';
+      document.getElementById('status').classList.remove('ok');
+    });
+
+    // QR trouvé
+    function onQR(data) {
+      const now = Date.now();
+      if (lastQR && lastQR.data === data && now - lastQR.time < cooldown) return;
+
+      lastQR = { data, time: now };
+      found++;
+
+      document.getElementById('result').classList.add('show');
+      document.getElementById('data').textContent = data;
+      document.getElementById('time').textContent = new Date().toLocaleString();
+      document.getElementById('found').textContent = found;
+
+      socket.emit('qr-scanned', { value: data, timestamp: now });
+      console.log('QR:', data);
+    }
+
+    // Scan
+    function scan() {
+      if (!running || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        requestAnimationFrame(scan);
+        return;
+      }
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Essai 1: Normal
+      let qr = jsQR(img.data, img.width, img.height);
+      if (qr) {
+        onQR(qr.data);
+      } else {
+        // Essai 2: Avec inversion
+        qr = jsQR(img.data, img.width, img.height, {
+          inversionAttempts: "attemptBoth"
+        });
+        if (qr) onQR(qr.data);
+      }
+
+      // Stats
+      fpsCount++;
+      if (Date.now() - fpsTime >= 1000) {
+        document.getElementById('fps').textContent = fpsCount;
+        fpsCount = 0;
+        fpsTime = Date.now();
+      }
+
+      requestAnimationFrame(scan);
+    }
+
+    // Init
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    }).then(stream => {
+      video.srcObject = stream;
+      video.play().then(() => {
+        console.log('Caméra:', video.videoWidth, 'x', video.videoHeight);
+        scan();
+      });
+    }).catch(err => {
+      alert('Erreur caméra: ' + err.message);
+    });
+  </script>
+</body>
+</html>
