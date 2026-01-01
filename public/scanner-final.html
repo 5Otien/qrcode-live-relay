@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner FINAL - Garantie de fonctionnement</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <title>Scanner FINAL - Ultra-Optimisé</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -180,11 +179,25 @@
     const socket = io();
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    // Web Worker pour traitement en parallèle
+    const workers = [];
+    const workerCount = 3; // 3 workers en parallèle
+    let currentWorker = 0;
+    let processingJob = null;
+    let jobId = 0;
+
+    // Créer les workers
+    for (let i = 0; i < workerCount; i++) {
+      const worker = new Worker('/js/qr-worker.js');
+      worker.onmessage = handleWorkerResult;
+      workers.push(worker);
+    }
 
     let scanning = true;
     let lastScan = null;
-    let cooldown = 2000;
+    let cooldown = 1500;
     let detections = 0;
     let frameCount = 0;
     let attemptCount = 0;
@@ -201,8 +214,19 @@
       document.getElementById('status').classList.remove('ok');
     });
 
+    // Résultat du worker
+    function handleWorkerResult(e) {
+      const { success, data, method, jobId: resultJobId } = e.data;
+
+      if (success && data) {
+        handleQR(data, method);
+      }
+
+      processingJob = null;
+    }
+
     // Détection QR
-    function handleQR(data) {
+    function handleQR(data, method) {
       const now = Date.now();
 
       if (lastScan && lastScan.data === data && now - lastScan.time < cooldown) {
@@ -215,7 +239,7 @@
       // Affichage
       document.getElementById('result').classList.add('show');
       document.getElementById('qr-data').textContent = data;
-      document.getElementById('timestamp').textContent = new Date().toLocaleString();
+      document.getElementById('timestamp').textContent = new Date().toLocaleString() + ` (${method})`;
       document.getElementById('scans').textContent = detections;
 
       // Envoi serveur
@@ -224,32 +248,42 @@
         timestamp: Date.now()
       });
 
-      console.log('✅ QR détecté:', data);
+      console.log('✅ QR:', data, 'Méthode:', method);
     }
 
-    // Scan loop
+    // Scan loop optimisé
     function scan() {
       if (!scanning || video.readyState !== video.HAVE_ENOUGH_DATA) {
         requestAnimationFrame(scan);
         return;
       }
 
-      // Capture
+      // Si un job est en cours, passer cette frame
+      if (processingJob !== null) {
+        requestAnimationFrame(scan);
+        return;
+      }
+
+      // Capture haute résolution
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-      // Détection jsQR
-      attemptCount++;
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "attemptBoth"
-      });
+      // Envoyer au worker (rotation entre workers)
+      const worker = workers[currentWorker];
+      currentWorker = (currentWorker + 1) % workerCount;
 
-      if (code) {
-        handleQR(code.data);
-      }
+      processingJob = ++jobId;
+      attemptCount++;
+
+      worker.postMessage({
+        imageData: imageData.data,
+        width: imageData.width,
+        height: imageData.height,
+        jobId: processingJob
+      }, [imageData.data.buffer]); // Transfer ownership pour perf
 
       // Stats
       frameCount++;
@@ -268,13 +302,14 @@
     // Init
     async function init() {
       try {
-        console.log('🚀 Démarrage caméra...');
+        console.log('🚀 Démarrage caméra haute résolution...');
 
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: 3840, min: 1920 },
+            height: { ideal: 2160, min: 1080 },
+            frameRate: { ideal: 60, min: 30 }
           }
         });
 
@@ -282,6 +317,7 @@
         await video.play();
 
         console.log('✅ Caméra:', video.videoWidth, 'x', video.videoHeight);
+        console.log('✅ Workers:', workerCount, 'threads');
 
         scan();
 
