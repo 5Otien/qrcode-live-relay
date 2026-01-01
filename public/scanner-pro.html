@@ -291,23 +291,80 @@
       document.getElementById('zoom-btn').textContent = `🔎 Zoom: x${zoomLevel}`;
     });
 
-    // Traitement d'image pour améliorer la détection
+    // Traitement d'image ultra-poussé pour QR codes difficiles
     function enhanceImage(imageData) {
       const data = imageData.data;
+      const width = imageData.width;
+      const height = imageData.height;
 
-      // Augmenter le contraste et la netteté
+      // Passe 1: Conversion en niveaux de gris avec pondération
+      const grayData = new Uint8ClampedArray(width * height);
       for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const idx = i / 4;
+        // Pondération pour meilleure perception (0.299R + 0.587G + 0.114B)
+        grayData[idx] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      }
 
-        // Binarisation adaptative
-        const threshold = 128;
-        const value = avg > threshold ? 255 : 0;
+      // Passe 2: Filtre médian pour réduire le bruit
+      const medianData = new Uint8ClampedArray(width * height);
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = y * width + x;
+          const neighbors = [
+            grayData[idx - width - 1], grayData[idx - width], grayData[idx - width + 1],
+            grayData[idx - 1], grayData[idx], grayData[idx + 1],
+            grayData[idx + width - 1], grayData[idx + width], grayData[idx + width + 1]
+          ];
+          neighbors.sort((a, b) => a - b);
+          medianData[idx] = neighbors[4]; // Médiane
+        }
+      }
 
-        // Augmenter le contraste
-        const contrast = 1.5;
-        data[i] = ((value - 128) * contrast) + 128;
-        data[i + 1] = ((value - 128) * contrast) + 128;
-        data[i + 2] = ((value - 128) * contrast) + 128;
+      // Passe 3: Égalisation d'histogramme pour améliorer le contraste
+      const histogram = new Array(256).fill(0);
+      for (let i = 0; i < medianData.length; i++) {
+        histogram[medianData[i]]++;
+      }
+
+      const cdf = new Array(256);
+      cdf[0] = histogram[0];
+      for (let i = 1; i < 256; i++) {
+        cdf[i] = cdf[i - 1] + histogram[i];
+      }
+
+      const cdfMin = cdf.find(v => v > 0);
+      const equalizedData = new Uint8ClampedArray(width * height);
+      for (let i = 0; i < medianData.length; i++) {
+        equalizedData[i] = Math.round(((cdf[medianData[i]] - cdfMin) / (width * height - cdfMin)) * 255);
+      }
+
+      // Passe 4: Binarisation adaptative (méthode de Sauvola)
+      const windowSize = 15;
+      const k = 0.5;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = y * width + x;
+
+          // Calculer moyenne et écart-type local
+          let sum = 0, sumSq = 0, count = 0;
+          for (let wy = Math.max(0, y - windowSize); wy < Math.min(height, y + windowSize); wy++) {
+            for (let wx = Math.max(0, x - windowSize); wx < Math.min(width, x + windowSize); wx++) {
+              const widx = wy * width + wx;
+              sum += equalizedData[widx];
+              sumSq += equalizedData[widx] * equalizedData[widx];
+              count++;
+            }
+          }
+
+          const mean = sum / count;
+          const variance = (sumSq / count) - (mean * mean);
+          const stdDev = Math.sqrt(variance);
+          const threshold = mean * (1 + k * ((stdDev / 128) - 1));
+
+          const pixelIdx = idx * 4;
+          const value = equalizedData[idx] > threshold ? 255 : 0;
+          data[pixelIdx] = data[pixelIdx + 1] = data[pixelIdx + 2] = value;
+        }
       }
 
       return imageData;
