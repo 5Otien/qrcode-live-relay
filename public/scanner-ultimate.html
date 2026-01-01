@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner ULTIMATE - Niveau Industriel</title>
+  <script type="module" src="https://unpkg.com/@zxing/browser@latest/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/image-processor.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: white;
+    }
+
+    .header {
+      padding: 15px;
+      text-align: center;
+      background: rgba(0,0,0,0.5);
+      border-bottom: 2px solid #e94560;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      margin-bottom: 5px;
+      background: linear-gradient(45deg, #e94560, #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 0.75rem;
+      opacity: 0.8;
+      font-family: monospace;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 5px 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+      font-size: 0.75rem;
+      margin-top: 8px;
+    }
+
+    .status.ok { background: rgba(0, 212, 255, 0.3); border: 1px solid #00d4ff; }
+
+    .main {
+      padding: 15px;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    .video-container {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 15px 0;
+      box-shadow: 0 10px 40px rgba(233, 69, 96, 0.3);
+      background: #000;
+    }
+
+    #video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    #canvas, #processCanvas {
+      display: none;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 70%;
+      height: 70%;
+      border: 2px solid rgba(233, 69, 96, 0.6);
+      border-radius: 15px;
+      pointer-events: none;
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.4);
+    }
+
+    .overlay.detecting {
+      border-color: #00d4ff;
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.8);
+      animation: pulse-border 1s infinite;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.02); }
+    }
+
+    .stats {
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-size: 0.7rem;
+      font-family: 'Courier New', monospace;
+      border: 1px solid rgba(233, 69, 96, 0.3);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .stat-item {
+      background: rgba(233, 69, 96, 0.2);
+      padding: 8px;
+      border-radius: 5px;
+      text-align: center;
+    }
+
+    .stat-value {
+      display: block;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #00d4ff;
+    }
+
+    .stat-label {
+      display: block;
+      font-size: 0.65rem;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+
+    .processing-list {
+      background: rgba(0,0,0,0.3);
+      padding: 8px;
+      border-radius: 5px;
+      max-height: 80px;
+      overflow-y: auto;
+      font-size: 0.65rem;
+      margin-top: 8px;
+    }
+
+    .processing-item {
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .processing-item:last-child {
+      border-bottom: none;
+    }
+
+    .processing-item.success {
+      color: #00d4ff;
+    }
+
+    .last-scan {
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(233, 69, 96, 0.2));
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      display: none;
+      border: 1px solid #00d4ff;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .last-scan.show {
+      display: block;
+    }
+
+    .qr-value {
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 5px;
+      word-break: break-all;
+      font-family: monospace;
+      margin-top: 8px;
+      font-size: 0.75rem;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .detection-method {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(233, 69, 96, 0.3);
+      border-radius: 10px;
+      font-size: 0.65rem;
+      margin-top: 5px;
+    }
+
+    .btn-home {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(45deg, #e94560, #0f3460);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      text-align: center;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>⚡ SCANNER ULTIMATE</h1>
+    <div class="subtitle">Multi-Algorithm • WebAssembly • Industrial Grade</div>
+    <div class="status" id="status">🔴 Initialisation...</div>
+  </div>
+
+  <div class="main">
+    <div class="video-container">
+      <video id="video" autoplay playsinline></video>
+      <div class="overlay" id="overlay"></div>
+      <canvas id="canvas"></canvas>
+      <canvas id="processCanvas"></canvas>
+    </div>
+
+    <div class="stats">
+      <div><strong>⚙️ SYSTÈME</strong></div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="stat-value" id="fps">0</span>
+          <span class="stat-label">FPS</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="resolution">0x0</span>
+          <span class="stat-label">RÉSOLUTION</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="scans">0</span>
+          <span class="stat-label">DÉTECTIONS</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 10px;"><strong>🔍 TRAITEMENT EN COURS</strong></div>
+      <div class="processing-list" id="processing-log"></div>
+    </div>
+
+    <div class="last-scan" id="last-scan">
+      <h3 style="font-size: 1rem; margin-bottom: 8px;">✅ QR CODE DÉTECTÉ</h3>
+      <div class="qr-value" id="qr-value"></div>
+      <div class="detection-method" id="method"></div>
+      <div style="font-size: 0.7rem; margin-top: 8px; opacity: 0.8;" id="timestamp"></div>
+    </div>
+
+    <a href="/" class="btn-home">← RETOUR MENU</a>
+  </div>
+
+  <script>
+    const socket = io();
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const processCanvas = document.getElementById('processCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const processCtx = processCanvas.getContext('2d', { willReadFrequently: true });
+
+    let isScanning = true;
+    let lastScan = null;
+    let scanCooldown = 1500;
+    let frameCount = 0;
+    let lastFpsTime = Date.now();
+    let detectionCount = 0;
+    let processingLog = [];
+    let codeReader = null;
+
+    // WebSocket
+    socket.on('connect', () => {
+      document.getElementById('status').textContent = '🟢 Connecté';
+      document.getElementById('status').classList.add('ok');
+    });
+
+    socket.on('disconnect', () => {
+      document.getElementById('status').textContent = '🔴 Déconnecté';
+      document.getElementById('status').classList.remove('ok');
+    });
+
+    // Logging
+    function addLog(message, success = false) {
+      processingLog.unshift({ message, success, time: Date.now() });
+      if (processingLog.length > 20) processingLog.pop();
+
+      const html = processingLog.slice(0, 10).map(log =>
+        `<div class="processing-item ${log.success ? 'success' : ''}">${log.message}</div>`
+      ).join('');
+
+      document.getElementById('processing-log').innerHTML = html;
+    }
+
+    // Gestion QR détecté
+    function handleQRCode(data, method) {
+      const now = Date.now();
+
+      if (lastScan && lastScan.data === data && now - lastScan.time < scanCooldown) {
+        return;
+      }
+
+      lastScan = { data, time: now };
+      detectionCount++;
+
+      // Affichage
+      document.getElementById('last-scan').classList.add('show');
+      document.getElementById('qr-value').textContent = data;
+      document.getElementById('method').textContent = `Méthode: ${method}`;
+      document.getElementById('timestamp').textContent = new Date().toLocaleString();
+      document.getElementById('scans').textContent = detectionCount;
+
+      // Envoi au serveur
+      socket.emit('qr-scanned', {
+        value: data,
+        timestamp: Date.now()
+      });
+
+      addLog(`✅ QR détecté via ${method}`, true);
+      console.log('✅ QR:', data, 'Méthode:', method);
+
+      // Feedback visuel
+      document.getElementById('overlay').classList.add('detecting');
+      setTimeout(() => {
+        document.getElementById('overlay').classList.remove('detecting');
+      }, 1000);
+    }
+
+    // Détection multi-algorithmes
+    async function detectQRCode(imageData) {
+      // 1. Essayer jsQR sur l'image originale
+      let code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+
+      if (code) {
+        return { data: code.data, method: 'jsQR (original)' };
+      }
+
+      // 2. Essayer ZXing sur l'image originale
+      try {
+        const result = await codeReader.decodeFromImageData(imageData);
+        if (result) {
+          return { data: result.text, method: 'ZXing WASM (original)' };
+        }
+      } catch (e) {
+        // Pas de QR trouvé
+      }
+
+      // 3. Traitement d'image avancé avec multiples variations
+      addLog('🔄 Traitement d\'image avancé...');
+      const variations = ImageProcessor.processImage(imageData);
+
+      for (const variation of variations) {
+        // Essayer jsQR
+        code = jsQR(variation.data.data, variation.data.width, variation.data.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          return { data: code.data, method: `jsQR (${variation.name})` };
+        }
+
+        // Essayer ZXing
+        try {
+          const result = await codeReader.decodeFromImageData(variation.data);
+          if (result) {
+            return { data: result.text, method: `ZXing (${variation.name})` };
+          }
+        } catch (e) {
+          // Continuer
+        }
+      }
+
+      return null;
+    }
+
+    // Boucle de scan principale
+    async function scanFrame() {
+      if (!isScanning) {
+        requestAnimationFrame(scanFrame);
+        return;
+      }
+
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Capturer l'image
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Détection
+        const result = await detectQRCode(imageData);
+
+        if (result) {
+          handleQRCode(result.data, result.method);
+        }
+
+        // FPS
+        frameCount++;
+        const now = Date.now();
+        if (now - lastFpsTime >= 1000) {
+          document.getElementById('fps').textContent = frameCount;
+          document.getElementById('resolution').textContent =
+            `${canvas.width}x${canvas.height}`;
+          frameCount = 0;
+          lastFpsTime = now;
+        }
+      }
+
+      requestAnimationFrame(scanFrame);
+    }
+
+    // Initialisation
+    async function init() {
+      try {
+        addLog('🚀 Initialisation ZXing WebAssembly...');
+
+        // Initialiser ZXing
+        const { BrowserMultiFormatReader } = window.ZXingBrowser;
+        codeReader = new BrowserMultiFormatReader();
+
+        addLog('📹 Démarrage caméra haute résolution...');
+
+        // Démarrer la caméra avec résolution maximale
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment",
+            width: { ideal: 4096 },
+            height: { ideal: 2160 },
+            frameRate: { ideal: 60 }
+          }
+        });
+
+        video.srcObject = stream;
+        await video.play();
+
+        addLog(`✅ Caméra: ${video.videoWidth}x${video.videoHeight}`, true);
+
+        // Démarrer le scan
+        scanFrame();
+
+        addLog('✅ Scanner ULTIMATE opérationnel', true);
+
+      } catch (err) {
+        console.error('❌ Erreur:', err);
+        addLog('❌ Erreur: ' + err.message);
+        alert('Erreur d\'accès à la caméra: ' + err.message);
+      }
+    }
+
+    // Lancement
+    init();
+  </script>
+</body>
+</html>
