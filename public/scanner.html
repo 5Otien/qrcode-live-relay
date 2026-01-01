@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scanner - QRCode Live Relay</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * {
@@ -171,6 +172,9 @@
     let html5QrCode;
     let isScanning = false;
     let scanTimeout = null;
+    let zxingCodeReader = null;
+    let videoElement = null;
+    let zxingInterval = null;
 
     // Connexion WebSocket
     socket.on('connect', () => {
@@ -223,20 +227,84 @@
       // Ignorer les erreurs normales de scan
     }
 
-    // Démarrer le scanner
+    // Fonction pour démarrer ZXing comme détection alternative
+    function startZXingBackup() {
+      try {
+        zxingCodeReader = new ZXing.BrowserQRCodeReader();
+
+        // Attendre que la vidéo soit disponible
+        setTimeout(() => {
+          videoElement = document.querySelector('#reader video');
+
+          if (!videoElement) {
+            console.warn('⚠️ Vidéo non trouvée pour ZXing');
+            return;
+          }
+
+          console.log('✅ ZXing backup activé');
+
+          // Scanner avec ZXing toutes les 500ms
+          zxingInterval = setInterval(() => {
+            if (isScanning || !videoElement) return;
+
+            zxingCodeReader.decodeFromVideoElement(videoElement)
+              .then(result => {
+                if (result && result.text && !isScanning) {
+                  console.log('🎯 ZXing a détecté un QR code!');
+                  onScanSuccess(result.text, result);
+                }
+              })
+              .catch(err => {
+                // Ignorer les erreurs, c'est normal si aucun QR n'est visible
+              });
+          }, 500);
+        }, 2000); // Attendre 2s que html5-qrcode initialise la vidéo
+
+      } catch (err) {
+        console.error('❌ Erreur ZXing:', err);
+      }
+    }
+
+    // Configuration améliorée pour les petits QR codes
     html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    const config = {
+      fps: 20, // Augmentation du FPS pour plus de réactivité
+      qrbox: function(viewfinderWidth, viewfinderHeight) {
+        // Zone de scan adaptative (80% de l'écran)
+        let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        let qrboxSize = Math.floor(minEdge * 0.8);
+        return {
+          width: qrboxSize,
+          height: qrboxSize
+        };
+      },
+      aspectRatio: 1.0
+    };
+
+    // Contraintes vidéo pour haute résolution
+    const videoConstraints = {
+      facingMode: "environment",
+      advanced: [
+        { width: { min: 1280, ideal: 1920 } },
+        { height: { min: 720, ideal: 1080 } },
+        { focusMode: "continuous" },
+        { zoom: { min: 1.0, max: 3.0 } }
+      ]
+    };
 
     Html5Qrcode.getCameras().then(cameras => {
       if (cameras && cameras.length) {
         html5QrCode.start(
-          { facingMode: "environment" },
+          videoConstraints,
           config,
           onScanSuccess,
           onScanError
         ).then(() => {
           document.getElementById('scanning-indicator').style.display = 'block';
-          console.log('✅ Scanner démarré');
+          console.log('✅ Scanner démarré avec haute résolution');
+
+          // Démarrer ZXing en backup pour les petits QR codes
+          startZXingBackup();
         });
       }
     }).catch(err => {
@@ -248,6 +316,9 @@
     window.addEventListener('beforeunload', () => {
       if (html5QrCode) {
         html5QrCode.stop();
+      }
+      if (zxingInterval) {
+        clearInterval(zxingInterval);
       }
     });
   </script>
