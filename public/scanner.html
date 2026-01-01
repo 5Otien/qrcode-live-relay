@@ -231,28 +231,18 @@
       qrbox: { width: 250, height: 250 }
     };
 
-    Html5Qrcode.getCameras().then(cameras => {
-      if (cameras && cameras.length) {
-        const cameraId = cameras[0].id;
-
-        html5QrCode.start(
-          cameraId,
-          config,
-          onScanSuccess,
-          onScanError
-        ).then(() => {
-          document.getElementById('scanning-indicator').style.display = 'block';
-          console.log('✅ Scanner démarré');
-        }).catch(err => {
-          console.error('❌ Erreur caméra:', err);
-          alert('Impossible d\'accéder à la caméra: ' + err);
-        });
-      } else {
-        alert('Aucune caméra trouvée');
-      }
+    // Utiliser facingMode pour forcer la caméra arrière
+    html5QrCode.start(
+      { facingMode: "environment" }, // Force la caméra arrière sur mobile
+      config,
+      onScanSuccess,
+      onScanError
+    ).then(() => {
+      document.getElementById('scanning-indicator').style.display = 'block';
+      console.log('✅ Scanner démarré avec caméra arrière');
     }).catch(err => {
-      console.error('❌ Erreur de détection caméra:', err);
-      alert('Impossible de détecter les caméras: ' + err);
+      console.error('❌ Erreur caméra:', err);
+      alert('Impossible d\'accéder à la caméra: ' + err);
     });
 
     // Arrêter le scanner à la fermeture
