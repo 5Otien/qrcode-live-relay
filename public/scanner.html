@@ -3,219 +3,128 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner ULTRA-POUSSÉ</title>
+  <title>Scanner QR Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Courier New', monospace;
-      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
-      color: #0ff;
-      overflow-x: hidden;
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: white;
     }
     .header {
       padding: 15px;
-      background: rgba(0,255,255,0.1);
-      border-bottom: 2px solid #0ff;
+      background: #111;
       text-align: center;
-      backdrop-filter: blur(10px);
+      border-bottom: 2px solid #0f0;
     }
-    h1 {
-      font-size: 1.3rem;
-      text-shadow: 0 0 10px #0ff;
-      letter-spacing: 3px;
-    }
-    .tech-badge {
-      display: inline-block;
-      padding: 3px 10px;
-      background: rgba(0,255,255,0.2);
-      border: 1px solid #0ff;
-      border-radius: 3px;
-      font-size: 0.7rem;
-      margin: 5px 3px;
-    }
+    h1 { color: #0f0; font-size: 1.5rem; }
     .status {
-      margin-top: 8px;
-      padding: 5px 15px;
-      background: rgba(255,0,0,0.3);
-      border: 1px solid #f00;
-      border-radius: 15px;
       display: inline-block;
-      font-size: 0.8rem;
+      padding: 5px 15px;
+      background: #f00;
+      border-radius: 15px;
+      margin-top: 10px;
+      font-size: 0.9rem;
     }
-    .status.ok {
-      background: rgba(0,255,0,0.3);
-      border-color: #0f0;
-      color: #0f0;
-    }
+    .status.ok { background: #0f0; color: #000; }
     .container { padding: 15px; }
-    .video-wrapper {
-      position: relative;
-      border: 2px solid #0ff;
+    #video {
+      width: 100%;
+      border: 3px solid #0f0;
       border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(0,255,255,0.3);
-    }
-    #video { width: 100%; display: block; }
-    .scan-overlay {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 70%;
-      height: 70%;
-      border: 2px solid #0ff;
-      box-shadow: 0 0 20px rgba(0,255,255,0.5);
-      pointer-events: none;
-    }
-    .scan-overlay.active {
-      border-color: #0f0;
-      box-shadow: 0 0 30px rgba(0,255,0,0.8);
-      animation: pulse 0.5s;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: translate(-50%, -50%) scale(1); }
-      50% { transform: translate(-50%, -50%) scale(1.05); }
     }
     .result {
       margin-top: 15px;
       padding: 15px;
-      background: rgba(0,255,255,0.1);
-      border: 1px solid #0ff;
-      border-radius: 8px;
+      background: #222;
+      border-radius: 10px;
+      border: 2px solid #0f0;
       display: none;
     }
-    .result.show {
-      display: block;
-      animation: slideIn 0.3s;
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    .result.show { display: block; }
     .qr-data {
-      background: rgba(0,0,0,0.5);
+      background: #000;
       padding: 10px;
       border-radius: 5px;
       word-break: break-all;
-      font-size: 0.85rem;
-      margin-top: 8px;
-      border-left: 3px solid #0ff;
-      max-height: 80px;
-      overflow-y: auto;
+      font-family: monospace;
+      margin-top: 10px;
+      color: #0f0;
     }
-    .method-tag {
-      display: inline-block;
-      padding: 2px 8px;
-      background: rgba(0,255,0,0.2);
-      border: 1px solid #0f0;
-      border-radius: 3px;
-      font-size: 0.7rem;
-      margin-top: 5px;
-    }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+    .stats {
+      display: flex;
+      gap: 10px;
       margin-top: 15px;
     }
-    .stat-box {
-      background: rgba(0,255,255,0.1);
-      border: 1px solid rgba(0,255,255,0.3);
+    .stat {
+      flex: 1;
+      background: #222;
       padding: 10px;
-      border-radius: 6px;
+      border-radius: 8px;
       text-align: center;
+      border: 1px solid #333;
     }
     .stat-val {
       display: block;
       font-size: 1.5rem;
+      color: #0f0;
       font-weight: bold;
-      color: #0ff;
-      text-shadow: 0 0 10px #0ff;
     }
     .stat-lbl {
-      font-size: 0.7rem;
-      opacity: 0.8;
-      margin-top: 3px;
-    }
-    .process-log {
-      margin-top: 15px;
-      background: rgba(0,0,0,0.5);
-      border: 1px solid rgba(0,255,255,0.3);
-      border-radius: 6px;
-      padding: 10px;
-      max-height: 100px;
-      overflow-y: auto;
-      font-size: 0.7rem;
-    }
-    .log-item {
-      padding: 3px 0;
-      border-bottom: 1px solid rgba(0,255,255,0.1);
+      font-size: 0.8rem;
       opacity: 0.7;
     }
-    .log-item:last-child { border-bottom: none; }
-    .log-item.success {
-      color: #0f0;
-      opacity: 1;
+    .method {
+      font-size: 0.75rem;
+      color: #0ff;
+      margin-top: 5px;
     }
     .btn {
       display: block;
       width: 100%;
       padding: 12px;
       margin-top: 15px;
-      background: linear-gradient(45deg, #0ff, #0af);
+      background: #0f0;
       color: #000;
       text-decoration: none;
       text-align: center;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: bold;
-      box-shadow: 0 0 15px rgba(0,255,255,0.5);
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>⚡ SCANNER ULTRA-POUSSÉ</h1>
-    <div>
-      <span class="tech-badge">Multi-Algo</span>
-      <span class="tech-badge">15+ Variations</span>
-      <span class="tech-badge">4K Ready</span>
-    </div>
-    <div class="status" id="status">⚫ INIT</div>
+    <h1>🎯 SCANNER QR PRO</h1>
+    <div class="status" id="status">⚫ Init...</div>
   </div>
 
   <div class="container">
-    <div class="video-wrapper">
-      <video id="video" autoplay playsinline></video>
-      <div class="scan-overlay" id="overlay"></div>
-    </div>
+    <video id="video" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
 
     <div class="result" id="result">
-      <h3 style="font-size:1rem;margin-bottom:8px;">✅ QR CODE DÉTECTÉ</h3>
+      <h3>✅ QR CODE DÉTECTÉ</h3>
       <div class="qr-data" id="data"></div>
-      <span class="method-tag" id="method"></span>
-      <div style="margin-top:8px;font-size:0.75rem;opacity:0.7;" id="time"></div>
+      <div class="method" id="method"></div>
+      <div style="margin-top:8px;font-size:0.8rem;opacity:0.7;" id="time"></div>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-box">
+    <div class="stats">
+      <div class="stat">
         <span class="stat-val" id="fps">0</span>
         <span class="stat-lbl">FPS</span>
       </div>
-      <div class="stat-box">
+      <div class="stat">
         <span class="stat-val" id="found">0</span>
-        <span class="stat-lbl">DÉTECTIONS</span>
+        <span class="stat-lbl">TROUVÉS</span>
       </div>
-      <div class="stat-box">
-        <span class="stat-val" id="variations">0</span>
-        <span class="stat-lbl">VARIATIONS</span>
+      <div class="stat">
+        <span class="stat-val" id="method-count">0</span>
+        <span class="stat-lbl">ESSAIS</span>
       </div>
-    </div>
-
-    <div class="process-log" id="log">
-      <div style="text-align:center;opacity:0.5;">Démarrage...</div>
     </div>
 
     <a href="/" class="btn">← RETOUR</a>
@@ -229,34 +138,21 @@
 
     let running = true;
     let lastQR = null;
-    let cooldown = 1000;
+    let cooldown = 1500;
     let found = 0;
     let fpsCount = 0;
     let fpsTime = Date.now();
-    let logs = [];
-    let variationsTested = 0;
 
     // Socket
     socket.on('connect', () => {
-      document.getElementById('status').textContent = '🟢 ONLINE';
+      document.getElementById('status').textContent = '🟢 CONNECTÉ';
       document.getElementById('status').classList.add('ok');
     });
 
     socket.on('disconnect', () => {
-      document.getElementById('status').textContent = '🔴 OFFLINE';
+      document.getElementById('status').textContent = '🔴 DÉCONNECTÉ';
       document.getElementById('status').classList.remove('ok');
     });
-
-    // Logging
-    function log(msg, success = false) {
-      logs.unshift({ msg, success, time: Date.now() });
-      if (logs.length > 15) logs.pop();
-
-      const html = logs.slice(0, 10).map(l =>
-        `<div class="log-item ${l.success ? 'success' : ''}">${l.msg}</div>`
-      ).join('');
-      document.getElementById('log').innerHTML = html;
-    }
 
     // QR trouvé
     function onQR(data, method) {
@@ -268,73 +164,93 @@
 
       document.getElementById('result').classList.add('show');
       document.getElementById('data').textContent = data;
-      document.getElementById('method').textContent = method;
+      document.getElementById('method').textContent = '📊 Méthode: ' + method;
       document.getElementById('time').textContent = new Date().toLocaleString();
       document.getElementById('found').textContent = found;
 
-      document.getElementById('overlay').classList.add('active');
-      setTimeout(() => {
-        document.getElementById('overlay').classList.remove('active');
-      }, 500);
-
       socket.emit('qr-scanned', { value: data, timestamp: now });
-      log(`✅ Détecté via ${method}`, true);
       console.log('QR:', data, 'Méthode:', method);
     }
 
-    // Traitement d'image professionnel
-    function processImage(imageData) {
-      const variations = [];
+    // Traitement d'image avancé pour QR codes flous/petits
+    function enhanceForQR(imageData) {
+      const data = imageData.data;
       const w = imageData.width;
       const h = imageData.height;
 
-      // 1. Original
-      variations.push({ name: 'Original', data: imageData });
-
-      // 2. Contraste élevé
-      const highContrast = ctx.createImageData(w, h);
-      for (let i = 0; i < imageData.data.length; i += 4) {
-        const avg = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
-        const val = avg < 128 ? Math.max(0, avg - 50) : Math.min(255, avg + 50);
-        highContrast.data[i] = highContrast.data[i+1] = highContrast.data[i+2] = val;
-        highContrast.data[i+3] = 255;
+      // 1. Calculer le seuil optimal (style Otsu simplifié)
+      let histogram = new Array(256).fill(0);
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+        histogram[gray]++;
       }
-      variations.push({ name: 'Contraste+', data: highContrast });
 
-      // 3. Binarisation simple
-      const binary = ctx.createImageData(w, h);
-      for (let i = 0; i < imageData.data.length; i += 4) {
-        const avg = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
-        const val = avg > 128 ? 255 : 0;
-        binary.data[i] = binary.data[i+1] = binary.data[i+2] = val;
-        binary.data[i+3] = 255;
+      // Trouver un bon seuil basé sur l'histogramme
+      let sum = 0;
+      let total = w * h;
+      for (let i = 0; i < 256; i++) sum += i * histogram[i];
+
+      let sumB = 0, wB = 0, wF = 0;
+      let maxVariance = 0;
+      let threshold = 128;
+
+      for (let i = 0; i < 256; i++) {
+        wB += histogram[i];
+        if (wB === 0) continue;
+        wF = total - wB;
+        if (wF === 0) break;
+
+        sumB += i * histogram[i];
+        let mB = sumB / wB;
+        let mF = (sum - sumB) / wF;
+        let variance = wB * wF * (mB - mF) * (mB - mF);
+
+        if (variance > maxVariance) {
+          maxVariance = variance;
+          threshold = i;
+        }
       }
-      variations.push({ name: 'Binaire', data: binary });
 
-      // 4. Luminosité augmentée
-      const bright = ctx.createImageData(w, h);
-      for (let i = 0; i < imageData.data.length; i += 4) {
-        bright.data[i] = Math.min(255, imageData.data[i] + 30);
-        bright.data[i+1] = Math.min(255, imageData.data[i+1] + 30);
-        bright.data[i+2] = Math.min(255, imageData.data[i+2] + 30);
-        bright.data[i+3] = 255;
-      }
-      variations.push({ name: 'Luminosité+', data: bright });
-
-      // 5. Sombre
-      const dark = ctx.createImageData(w, h);
-      for (let i = 0; i < imageData.data.length; i += 4) {
-        dark.data[i] = Math.max(0, imageData.data[i] - 30);
-        dark.data[i+1] = Math.max(0, imageData.data[i+1] - 30);
-        dark.data[i+2] = Math.max(0, imageData.data[i+2] - 30);
-        dark.data[i+3] = 255;
-      }
-      variations.push({ name: 'Sombre', data: dark });
-
-      return variations;
+      return threshold;
     }
 
-    // Scan multi-variations
+    // Améliorer le contraste (rendre le noir plus noir, le blanc plus blanc)
+    function boostContrast(imageData, factor = 1.8) {
+      const enhanced = ctx.createImageData(imageData.width, imageData.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        // Conversion en niveaux de gris
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+
+        // Augmentation du contraste centré sur 128
+        let value = ((gray - 128) * factor) + 128;
+        value = Math.max(0, Math.min(255, value));
+
+        enhanced.data[i] = enhanced.data[i + 1] = enhanced.data[i + 2] = value;
+        enhanced.data[i + 3] = 255;
+      }
+
+      return enhanced;
+    }
+
+    // Binarisation adaptative
+    function adaptiveBinarize(imageData, threshold) {
+      const binary = ctx.createImageData(imageData.width, imageData.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        const value = gray > threshold ? 255 : 0;
+
+        binary.data[i] = binary.data[i + 1] = binary.data[i + 2] = value;
+        binary.data[i + 3] = 255;
+      }
+
+      return binary;
+    }
+
+    // Scan avec traitement intelligent
     function scan() {
       if (!running || video.readyState !== video.HAVE_ENOUGH_DATA) {
         requestAnimationFrame(scan);
@@ -345,37 +261,126 @@
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
 
-      const baseImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const variations = processImage(baseImage);
-      variationsTested = 0;
+      const original = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let methodCount = 0;
 
-      // Tester chaque variation
-      for (const variation of variations) {
-        variationsTested++;
-
-        // Essai 1: Normal
-        let qr = jsQR(variation.data.data, variation.data.width, variation.data.height, {
-          inversionAttempts: "dontInvert"
-        });
-
-        if (qr) {
-          onQR(qr.data, variation.name);
-          break;
+      // Méthode 1: Image originale
+      methodCount++;
+      let qr = jsQR(original.data, original.width, original.height, {
+        inversionAttempts: "attemptBoth"
+      });
+      if (qr) {
+        onQR(qr.data, 'Original');
+        document.getElementById('method-count').textContent = methodCount;
+        fpsCount++;
+        if (Date.now() - fpsTime >= 1000) {
+          document.getElementById('fps').textContent = fpsCount;
+          fpsCount = 0;
+          fpsTime = Date.now();
         }
-
-        // Essai 2: Avec inversion
-        qr = jsQR(variation.data.data, variation.data.width, variation.data.height, {
-          inversionAttempts: "attemptBoth"
-        });
-
-        if (qr) {
-          onQR(qr.data, variation.name + ' (inv)');
-          break;
-        }
+        requestAnimationFrame(scan);
+        return;
       }
 
-      // Stats
-      document.getElementById('variations').textContent = variationsTested;
+      // Méthode 2: Contraste boosté (meilleur pour QR flous)
+      methodCount++;
+      const contrasted = boostContrast(original, 2.0);
+      qr = jsQR(contrasted.data, contrasted.width, contrasted.height, {
+        inversionAttempts: "attemptBoth"
+      });
+      if (qr) {
+        onQR(qr.data, 'Contraste x2');
+        document.getElementById('method-count').textContent = methodCount;
+        fpsCount++;
+        if (Date.now() - fpsTime >= 1000) {
+          document.getElementById('fps').textContent = fpsCount;
+          fpsCount = 0;
+          fpsTime = Date.now();
+        }
+        requestAnimationFrame(scan);
+        return;
+      }
+
+      // Méthode 3: Contraste extrême (pour QR très petits)
+      methodCount++;
+      const extremeContrast = boostContrast(original, 3.0);
+      qr = jsQR(extremeContrast.data, extremeContrast.width, extremeContrast.height, {
+        inversionAttempts: "attemptBoth"
+      });
+      if (qr) {
+        onQR(qr.data, 'Contraste x3');
+        document.getElementById('method-count').textContent = methodCount;
+        fpsCount++;
+        if (Date.now() - fpsTime >= 1000) {
+          document.getElementById('fps').textContent = fpsCount;
+          fpsCount = 0;
+          fpsTime = Date.now();
+        }
+        requestAnimationFrame(scan);
+        return;
+      }
+
+      // Méthode 4: Binarisation adaptative (seuil auto)
+      methodCount++;
+      const threshold = enhanceForQR(original);
+      const adaptive = adaptiveBinarize(original, threshold);
+      qr = jsQR(adaptive.data, adaptive.width, adaptive.height, {
+        inversionAttempts: "attemptBoth"
+      });
+      if (qr) {
+        onQR(qr.data, 'Binaire adaptatif');
+        document.getElementById('method-count').textContent = methodCount;
+        fpsCount++;
+        if (Date.now() - fpsTime >= 1000) {
+          document.getElementById('fps').textContent = fpsCount;
+          fpsCount = 0;
+          fpsTime = Date.now();
+        }
+        requestAnimationFrame(scan);
+        return;
+      }
+
+      // Méthode 5: Binarisation avec seuil bas (plus de noir)
+      methodCount++;
+      const lowThreshold = adaptiveBinarize(original, 100);
+      qr = jsQR(lowThreshold.data, lowThreshold.width, lowThreshold.height, {
+        inversionAttempts: "attemptBoth"
+      });
+      if (qr) {
+        onQR(qr.data, 'Binaire seuil bas');
+        document.getElementById('method-count').textContent = methodCount;
+        fpsCount++;
+        if (Date.now() - fpsTime >= 1000) {
+          document.getElementById('fps').textContent = fpsCount;
+          fpsCount = 0;
+          fpsTime = Date.now();
+        }
+        requestAnimationFrame(scan);
+        return;
+      }
+
+      // Méthode 6: Binarisation avec seuil haut (plus de blanc)
+      methodCount++;
+      const highThreshold = adaptiveBinarize(original, 155);
+      qr = jsQR(highThreshold.data, highThreshold.width, highThreshold.height, {
+        inversionAttempts: "attemptBoth"
+      });
+      if (qr) {
+        onQR(qr.data, 'Binaire seuil haut');
+        document.getElementById('method-count').textContent = methodCount;
+        fpsCount++;
+        if (Date.now() - fpsTime >= 1000) {
+          document.getElementById('fps').textContent = fpsCount;
+          fpsCount = 0;
+          fpsTime = Date.now();
+        }
+        requestAnimationFrame(scan);
+        return;
+      }
+
+      document.getElementById('method-count').textContent = methodCount;
+
+      // Stats FPS
       fpsCount++;
       if (Date.now() - fpsTime >= 1000) {
         document.getElementById('fps').textContent = fpsCount;
@@ -387,24 +392,20 @@
     }
 
     // Init
-    log('🚀 Initialisation...');
-
     navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "environment",
-        width: { ideal: 3840, min: 1920 },
-        height: { ideal: 2160, min: 1080 },
-        frameRate: { ideal: 60 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
       }
     }).then(stream => {
       video.srcObject = stream;
       video.play().then(() => {
-        log(`✅ Caméra: ${video.videoWidth}x${video.videoHeight}`, true);
-        log('⚡ 5 variations + inversions = 10 essais/frame', true);
+        console.log('📷 Caméra:', video.videoWidth, 'x', video.videoHeight);
+        console.log('🔍 6 méthodes de traitement d\'image activées');
         scan();
       });
     }).catch(err => {
-      log('❌ Erreur: ' + err.message);
       alert('Erreur caméra: ' + err.message);
     });
   </script>
