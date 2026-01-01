@@ -3,113 +3,255 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner QR Pro</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <title>Scanner QR - Nimiq</title>
+  <script type="module">
+    import QrScanner from 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js';
+    window.QrScanner = QrScanner;
+  </script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
-      background: #000;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
       color: white;
+      min-height: 100vh;
     }
     .header {
-      padding: 15px;
-      background: #111;
+      padding: 20px;
+      background: rgba(0,0,0,0.3);
       text-align: center;
-      border-bottom: 2px solid #0f0;
+      border-bottom: 3px solid #0f0;
+      backdrop-filter: blur(10px);
     }
-    h1 { color: #0f0; font-size: 1.5rem; }
+    h1 {
+      color: #0f0;
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px rgba(0,255,0,0.5);
+    }
+    .tech-info {
+      font-size: 0.85rem;
+      color: #0ff;
+      margin-top: 8px;
+    }
+    .tech-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(0,255,0,0.2);
+      border: 1px solid #0f0;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin: 5px 3px;
+    }
     .status {
       display: inline-block;
-      padding: 5px 15px;
+      padding: 6px 20px;
       background: #f00;
-      border-radius: 15px;
+      border-radius: 20px;
       margin-top: 10px;
       font-size: 0.9rem;
+      font-weight: bold;
     }
     .status.ok { background: #0f0; color: #000; }
-    .container { padding: 15px; }
+    .container { padding: 20px; max-width: 800px; margin: 0 auto; }
+
+    .video-container {
+      position: relative;
+      border: 3px solid #0f0;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(0,255,0,0.3);
+      background: #000;
+    }
     #video {
       width: 100%;
-      border: 3px solid #0f0;
-      border-radius: 10px;
+      display: block;
     }
-    .result {
-      margin-top: 15px;
-      padding: 15px;
-      background: #222;
+    .scan-region {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 250px;
+      height: 250px;
+      border: 3px solid #0ff;
       border-radius: 10px;
+      pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+    }
+    .scan-region::before,
+    .scan-region::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #0f0;
+    }
+    .scan-region::before {
+      top: -3px;
+      left: -3px;
+      border-right: none;
+      border-bottom: none;
+    }
+    .scan-region::after {
+      bottom: -3px;
+      right: -3px;
+      border-left: none;
+      border-top: none;
+    }
+    .scan-line {
+      position: absolute;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #0f0, transparent);
+      animation: scan 2s linear infinite;
+      box-shadow: 0 0 10px #0f0;
+    }
+    @keyframes scan {
+      0%, 100% { top: 0; }
+      50% { top: 100%; }
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      background: rgba(0,255,0,0.1);
       border: 2px solid #0f0;
+      border-radius: 12px;
       display: none;
+      animation: slideIn 0.3s;
     }
     .result.show { display: block; }
-    .qr-data {
-      background: #000;
-      padding: 10px;
-      border-radius: 5px;
-      word-break: break-all;
-      font-family: monospace;
-      margin-top: 10px;
-      color: #0f0;
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
+    .result h3 {
+      color: #0f0;
+      margin-bottom: 15px;
+      font-size: 1.2rem;
+    }
+    .qr-data {
+      background: rgba(0,0,0,0.5);
+      padding: 15px;
+      border-radius: 8px;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+      color: #0ff;
+      border-left: 4px solid #0f0;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .result-info {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      opacity: 0.8;
+      color: #0ff;
+    }
+
     .stats {
-      display: flex;
-      gap: 10px;
-      margin-top: 15px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 20px;
     }
     .stat {
-      flex: 1;
-      background: #222;
-      padding: 10px;
-      border-radius: 8px;
+      background: rgba(0,255,255,0.1);
+      padding: 15px;
+      border-radius: 10px;
       text-align: center;
-      border: 1px solid #333;
+      border: 2px solid rgba(0,255,255,0.3);
     }
     .stat-val {
       display: block;
-      font-size: 1.5rem;
-      color: #0f0;
+      font-size: 2rem;
+      color: #0ff;
       font-weight: bold;
+      text-shadow: 0 0 10px rgba(0,255,255,0.5);
     }
     .stat-lbl {
       font-size: 0.8rem;
-      opacity: 0.7;
-    }
-    .method {
-      font-size: 0.75rem;
-      color: #0ff;
+      opacity: 0.8;
       margin-top: 5px;
     }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
     .btn {
-      display: block;
-      width: 100%;
-      padding: 12px;
-      margin-top: 15px;
-      background: #0f0;
-      color: #000;
-      text-decoration: none;
-      text-align: center;
-      border-radius: 8px;
+      flex: 1;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
       font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: linear-gradient(45deg, #0f0, #0a0);
+      color: #000;
+      box-shadow: 0 0 20px rgba(0,255,0,0.4);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 30px rgba(0,255,0,0.6);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .api-info {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(0,100,255,0.1);
+      border: 1px solid rgba(0,100,255,0.3);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #0af;
+    }
+    .api-info.native {
+      background: rgba(0,255,0,0.1);
+      border-color: rgba(0,255,0,0.3);
+      color: #0f0;
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>🎯 SCANNER QR PRO</h1>
-    <div class="status" id="status">⚫ Init...</div>
+    <h1>⚡ SCANNER QR ULTRA-RAPIDE</h1>
+    <div class="tech-info">Powered by Nimiq QR Scanner</div>
+    <div>
+      <span class="tech-badge">Native API</span>
+      <span class="tech-badge">WebWorker</span>
+      <span class="tech-badge">8x Plus Rapide</span>
+    </div>
+    <div class="status" id="status">⚫ Initialisation...</div>
   </div>
 
   <div class="container">
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="video-container">
+      <video id="video" playsinline></video>
+      <div class="scan-region">
+        <div class="scan-line"></div>
+      </div>
+    </div>
 
     <div class="result" id="result">
       <h3>✅ QR CODE DÉTECTÉ</h3>
       <div class="qr-data" id="data"></div>
-      <div class="method" id="method"></div>
-      <div style="margin-top:8px;font-size:0.8rem;opacity:0.7;" id="time"></div>
+      <div class="result-info">
+        <div id="timestamp"></div>
+        <div id="corners"></div>
+      </div>
     </div>
 
     <div class="stats">
@@ -119,29 +261,36 @@
       </div>
       <div class="stat">
         <span class="stat-val" id="found">0</span>
-        <span class="stat-lbl">TROUVÉS</span>
+        <span class="stat-lbl">DÉTECTIONS</span>
       </div>
       <div class="stat">
-        <span class="stat-val" id="method-count">0</span>
-        <span class="stat-lbl">ESSAIS</span>
+        <span class="stat-val" id="scans">0</span>
+        <span class="stat-lbl">SCANS</span>
       </div>
     </div>
 
-    <a href="/" class="btn">← RETOUR</a>
+    <div class="api-info" id="api-info">
+      <strong>📊 Détection:</strong> Chargement...
+    </div>
+
+    <div class="controls">
+      <a href="/" class="btn btn-secondary">← RETOUR</a>
+      <button class="btn btn-primary" id="toggle-inversion">🔄 Inversion Couleurs</button>
+    </div>
   </div>
 
-  <script>
+  <script type="module">
     const socket = io();
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    let running = true;
+    let scanner = null;
     let lastQR = null;
     let cooldown = 1500;
     let found = 0;
+    let scans = 0;
     let fpsCount = 0;
     let fpsTime = Date.now();
+    let inversionEnabled = false;
 
     // Socket
     socket.on('connect', () => {
@@ -154,259 +303,112 @@
       document.getElementById('status').classList.remove('ok');
     });
 
-    // QR trouvé
-    function onQR(data, method) {
+    // Callback quand QR détecté
+    function onScanSuccess(result) {
+      scans++;
+      document.getElementById('scans').textContent = scans;
+
       const now = Date.now();
+      const data = result.data;
+
+      // Cooldown pour éviter les doublons
       if (lastQR && lastQR.data === data && now - lastQR.time < cooldown) return;
 
       lastQR = { data, time: now };
       found++;
 
+      // Afficher le résultat
       document.getElementById('result').classList.add('show');
       document.getElementById('data').textContent = data;
-      document.getElementById('method').textContent = '📊 Méthode: ' + method;
-      document.getElementById('time').textContent = new Date().toLocaleString();
       document.getElementById('found').textContent = found;
+      document.getElementById('timestamp').textContent = '🕒 ' + new Date().toLocaleString();
 
+      // Afficher les coins détectés si disponibles
+      if (result.cornerPoints) {
+        const corners = result.cornerPoints.map(p => `(${Math.round(p.x)},${Math.round(p.y)})`).join(' ');
+        document.getElementById('corners').textContent = '📍 Coins: ' + corners;
+      }
+
+      // Envoyer via socket
       socket.emit('qr-scanned', { value: data, timestamp: now });
-      console.log('QR:', data, 'Méthode:', method);
-    }
 
-    // Traitement d'image avancé pour QR codes flous/petits
-    function enhanceForQR(imageData) {
-      const data = imageData.data;
-      const w = imageData.width;
-      const h = imageData.height;
+      console.log('✅ QR détecté:', data);
+      console.log('📊 Résultat complet:', result);
 
-      // 1. Calculer le seuil optimal (style Otsu simplifié)
-      let histogram = new Array(256).fill(0);
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-        histogram[gray]++;
-      }
-
-      // Trouver un bon seuil basé sur l'histogramme
-      let sum = 0;
-      let total = w * h;
-      for (let i = 0; i < 256; i++) sum += i * histogram[i];
-
-      let sumB = 0, wB = 0, wF = 0;
-      let maxVariance = 0;
-      let threshold = 128;
-
-      for (let i = 0; i < 256; i++) {
-        wB += histogram[i];
-        if (wB === 0) continue;
-        wF = total - wB;
-        if (wF === 0) break;
-
-        sumB += i * histogram[i];
-        let mB = sumB / wB;
-        let mF = (sum - sumB) / wF;
-        let variance = wB * wF * (mB - mF) * (mB - mF);
-
-        if (variance > maxVariance) {
-          maxVariance = variance;
-          threshold = i;
-        }
-      }
-
-      return threshold;
-    }
-
-    // Améliorer le contraste (rendre le noir plus noir, le blanc plus blanc)
-    function boostContrast(imageData, factor = 1.8) {
-      const enhanced = ctx.createImageData(imageData.width, imageData.height);
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        // Conversion en niveaux de gris
-        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-
-        // Augmentation du contraste centré sur 128
-        let value = ((gray - 128) * factor) + 128;
-        value = Math.max(0, Math.min(255, value));
-
-        enhanced.data[i] = enhanced.data[i + 1] = enhanced.data[i + 2] = value;
-        enhanced.data[i + 3] = 255;
-      }
-
-      return enhanced;
-    }
-
-    // Binarisation adaptative
-    function adaptiveBinarize(imageData, threshold) {
-      const binary = ctx.createImageData(imageData.width, imageData.height);
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-        const value = gray > threshold ? 255 : 0;
-
-        binary.data[i] = binary.data[i + 1] = binary.data[i + 2] = value;
-        binary.data[i + 3] = 255;
-      }
-
-      return binary;
-    }
-
-    // Scan avec traitement intelligent
-    function scan() {
-      if (!running || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        requestAnimationFrame(scan);
-        return;
-      }
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-
-      const original = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      let methodCount = 0;
-
-      // Méthode 1: Image originale
-      methodCount++;
-      let qr = jsQR(original.data, original.width, original.height, {
-        inversionAttempts: "attemptBoth"
-      });
-      if (qr) {
-        onQR(qr.data, 'Original');
-        document.getElementById('method-count').textContent = methodCount;
-        fpsCount++;
-        if (Date.now() - fpsTime >= 1000) {
-          document.getElementById('fps').textContent = fpsCount;
-          fpsCount = 0;
-          fpsTime = Date.now();
-        }
-        requestAnimationFrame(scan);
-        return;
-      }
-
-      // Méthode 2: Contraste boosté (meilleur pour QR flous)
-      methodCount++;
-      const contrasted = boostContrast(original, 2.0);
-      qr = jsQR(contrasted.data, contrasted.width, contrasted.height, {
-        inversionAttempts: "attemptBoth"
-      });
-      if (qr) {
-        onQR(qr.data, 'Contraste x2');
-        document.getElementById('method-count').textContent = methodCount;
-        fpsCount++;
-        if (Date.now() - fpsTime >= 1000) {
-          document.getElementById('fps').textContent = fpsCount;
-          fpsCount = 0;
-          fpsTime = Date.now();
-        }
-        requestAnimationFrame(scan);
-        return;
-      }
-
-      // Méthode 3: Contraste extrême (pour QR très petits)
-      methodCount++;
-      const extremeContrast = boostContrast(original, 3.0);
-      qr = jsQR(extremeContrast.data, extremeContrast.width, extremeContrast.height, {
-        inversionAttempts: "attemptBoth"
-      });
-      if (qr) {
-        onQR(qr.data, 'Contraste x3');
-        document.getElementById('method-count').textContent = methodCount;
-        fpsCount++;
-        if (Date.now() - fpsTime >= 1000) {
-          document.getElementById('fps').textContent = fpsCount;
-          fpsCount = 0;
-          fpsTime = Date.now();
-        }
-        requestAnimationFrame(scan);
-        return;
-      }
-
-      // Méthode 4: Binarisation adaptative (seuil auto)
-      methodCount++;
-      const threshold = enhanceForQR(original);
-      const adaptive = adaptiveBinarize(original, threshold);
-      qr = jsQR(adaptive.data, adaptive.width, adaptive.height, {
-        inversionAttempts: "attemptBoth"
-      });
-      if (qr) {
-        onQR(qr.data, 'Binaire adaptatif');
-        document.getElementById('method-count').textContent = methodCount;
-        fpsCount++;
-        if (Date.now() - fpsTime >= 1000) {
-          document.getElementById('fps').textContent = fpsCount;
-          fpsCount = 0;
-          fpsTime = Date.now();
-        }
-        requestAnimationFrame(scan);
-        return;
-      }
-
-      // Méthode 5: Binarisation avec seuil bas (plus de noir)
-      methodCount++;
-      const lowThreshold = adaptiveBinarize(original, 100);
-      qr = jsQR(lowThreshold.data, lowThreshold.width, lowThreshold.height, {
-        inversionAttempts: "attemptBoth"
-      });
-      if (qr) {
-        onQR(qr.data, 'Binaire seuil bas');
-        document.getElementById('method-count').textContent = methodCount;
-        fpsCount++;
-        if (Date.now() - fpsTime >= 1000) {
-          document.getElementById('fps').textContent = fpsCount;
-          fpsCount = 0;
-          fpsTime = Date.now();
-        }
-        requestAnimationFrame(scan);
-        return;
-      }
-
-      // Méthode 6: Binarisation avec seuil haut (plus de blanc)
-      methodCount++;
-      const highThreshold = adaptiveBinarize(original, 155);
-      qr = jsQR(highThreshold.data, highThreshold.width, highThreshold.height, {
-        inversionAttempts: "attemptBoth"
-      });
-      if (qr) {
-        onQR(qr.data, 'Binaire seuil haut');
-        document.getElementById('method-count').textContent = methodCount;
-        fpsCount++;
-        if (Date.now() - fpsTime >= 1000) {
-          document.getElementById('fps').textContent = fpsCount;
-          fpsCount = 0;
-          fpsTime = Date.now();
-        }
-        requestAnimationFrame(scan);
-        return;
-      }
-
-      document.getElementById('method-count').textContent = methodCount;
-
-      // Stats FPS
+      // FPS
       fpsCount++;
       if (Date.now() - fpsTime >= 1000) {
         document.getElementById('fps').textContent = fpsCount;
         fpsCount = 0;
         fpsTime = Date.now();
       }
-
-      requestAnimationFrame(scan);
     }
 
-    // Init
-    navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+    // Toggle inversion des couleurs
+    document.getElementById('toggle-inversion').addEventListener('click', () => {
+      inversionEnabled = !inversionEnabled;
+      if (scanner) {
+        scanner.setInversionMode(inversionEnabled ? 'both' : 'original');
+        document.getElementById('toggle-inversion').textContent =
+          inversionEnabled ? '✅ Inversion ON' : '🔄 Inversion Couleurs';
       }
-    }).then(stream => {
-      video.srcObject = stream;
-      video.play().then(() => {
-        console.log('📷 Caméra:', video.videoWidth, 'x', video.videoHeight);
-        console.log('🔍 6 méthodes de traitement d\'image activées');
-        scan();
-      });
-    }).catch(err => {
-      alert('Erreur caméra: ' + err.message);
+    });
+
+    // Init scanner
+    async function initScanner() {
+      try {
+        // Vérifier si BarcodeDetector natif est disponible
+        const hasNative = 'BarcodeDetector' in window;
+        const apiInfo = document.getElementById('api-info');
+
+        if (hasNative) {
+          apiInfo.classList.add('native');
+          apiInfo.innerHTML = '<strong>🚀 API Native BarcodeDetector:</strong> ACTIVÉE (Performance maximale!)';
+        } else {
+          apiInfo.innerHTML = '<strong>⚙️ Mode WebAssembly:</strong> Fallback activé (excellentes performances)';
+        }
+
+        // Créer le scanner
+        scanner = new QrScanner(
+          video,
+          result => onScanSuccess(result),
+          {
+            returnDetailedScanResult: true,
+            highlightScanRegion: false,
+            highlightCodeOutline: false,
+            maxScansPerSecond: 10, // Limite à 10 scans/sec pour économiser CPU
+            preferredCamera: 'environment' // Caméra arrière
+          }
+        );
+
+        // Démarrer
+        await scanner.start();
+
+        console.log('📷 Scanner démarré!');
+        console.log('🔍 API native:', hasNative ? 'OUI' : 'NON');
+
+      } catch (err) {
+        console.error('❌ Erreur scanner:', err);
+        alert('Erreur: ' + err.message);
+        document.getElementById('status').textContent = '❌ ERREUR';
+      }
+    }
+
+    // Attendre que QrScanner soit chargé
+    window.addEventListener('load', () => {
+      if (window.QrScanner) {
+        // Définir le chemin du worker
+        QrScanner.WORKER_PATH = 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner-worker.min.js';
+        initScanner();
+      } else {
+        console.error('❌ QrScanner non chargé');
+        alert('Erreur de chargement de la bibliothèque QR Scanner');
+      }
+    });
+
+    // Cleanup
+    window.addEventListener('beforeunload', () => {
+      if (scanner) scanner.destroy();
     });
   </script>
 </body>
