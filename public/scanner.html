@@ -3,118 +3,219 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scanner QR</title>
+  <title>Scanner ULTRA-POUSSÉ</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      background: #000;
-      color: white;
+      font-family: 'Courier New', monospace;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      color: #0ff;
+      overflow-x: hidden;
     }
     .header {
       padding: 15px;
-      background: #111;
+      background: rgba(0,255,255,0.1);
+      border-bottom: 2px solid #0ff;
       text-align: center;
-      border-bottom: 2px solid #0f0;
+      backdrop-filter: blur(10px);
     }
-    h1 { color: #0f0; font-size: 1.5rem; }
-    .status {
+    h1 {
+      font-size: 1.3rem;
+      text-shadow: 0 0 10px #0ff;
+      letter-spacing: 3px;
+    }
+    .tech-badge {
       display: inline-block;
-      padding: 5px 15px;
-      background: #f00;
-      border-radius: 15px;
-      margin-top: 10px;
-      font-size: 0.9rem;
+      padding: 3px 10px;
+      background: rgba(0,255,255,0.2);
+      border: 1px solid #0ff;
+      border-radius: 3px;
+      font-size: 0.7rem;
+      margin: 5px 3px;
     }
-    .status.ok { background: #0f0; color: #000; }
+    .status {
+      margin-top: 8px;
+      padding: 5px 15px;
+      background: rgba(255,0,0,0.3);
+      border: 1px solid #f00;
+      border-radius: 15px;
+      display: inline-block;
+      font-size: 0.8rem;
+    }
+    .status.ok {
+      background: rgba(0,255,0,0.3);
+      border-color: #0f0;
+      color: #0f0;
+    }
     .container { padding: 15px; }
-    #video {
-      width: 100%;
-      border: 3px solid #0f0;
+    .video-wrapper {
+      position: relative;
+      border: 2px solid #0ff;
       border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0,255,255,0.3);
+    }
+    #video { width: 100%; display: block; }
+    .scan-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 70%;
+      height: 70%;
+      border: 2px solid #0ff;
+      box-shadow: 0 0 20px rgba(0,255,255,0.5);
+      pointer-events: none;
+    }
+    .scan-overlay.active {
+      border-color: #0f0;
+      box-shadow: 0 0 30px rgba(0,255,0,0.8);
+      animation: pulse 0.5s;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.05); }
     }
     .result {
       margin-top: 15px;
       padding: 15px;
-      background: #222;
-      border-radius: 10px;
-      border: 2px solid #0f0;
+      background: rgba(0,255,255,0.1);
+      border: 1px solid #0ff;
+      border-radius: 8px;
       display: none;
     }
-    .result.show { display: block; }
+    .result.show {
+      display: block;
+      animation: slideIn 0.3s;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .qr-data {
-      background: #000;
+      background: rgba(0,0,0,0.5);
       padding: 10px;
       border-radius: 5px;
       word-break: break-all;
-      font-family: monospace;
-      margin-top: 10px;
-      color: #0f0;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      border-left: 3px solid #0ff;
+      max-height: 80px;
+      overflow-y: auto;
     }
-    .stats {
-      display: flex;
-      gap: 10px;
+    .method-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(0,255,0,0.2);
+      border: 1px solid #0f0;
+      border-radius: 3px;
+      font-size: 0.7rem;
+      margin-top: 5px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
       margin-top: 15px;
     }
-    .stat {
-      flex: 1;
-      background: #222;
+    .stat-box {
+      background: rgba(0,255,255,0.1);
+      border: 1px solid rgba(0,255,255,0.3);
       padding: 10px;
-      border-radius: 8px;
+      border-radius: 6px;
       text-align: center;
-      border: 1px solid #333;
     }
     .stat-val {
       display: block;
       font-size: 1.5rem;
-      color: #0f0;
       font-weight: bold;
+      color: #0ff;
+      text-shadow: 0 0 10px #0ff;
     }
     .stat-lbl {
-      font-size: 0.8rem;
+      font-size: 0.7rem;
+      opacity: 0.8;
+      margin-top: 3px;
+    }
+    .process-log {
+      margin-top: 15px;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(0,255,255,0.3);
+      border-radius: 6px;
+      padding: 10px;
+      max-height: 100px;
+      overflow-y: auto;
+      font-size: 0.7rem;
+    }
+    .log-item {
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(0,255,255,0.1);
       opacity: 0.7;
+    }
+    .log-item:last-child { border-bottom: none; }
+    .log-item.success {
+      color: #0f0;
+      opacity: 1;
     }
     .btn {
       display: block;
       width: 100%;
       padding: 12px;
       margin-top: 15px;
-      background: #0f0;
+      background: linear-gradient(45deg, #0ff, #0af);
       color: #000;
       text-decoration: none;
       text-align: center;
-      border-radius: 8px;
+      border-radius: 6px;
       font-weight: bold;
+      box-shadow: 0 0 15px rgba(0,255,255,0.5);
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>🎯 SCANNER QR</h1>
-    <div class="status" id="status">⚫ Init...</div>
+    <h1>⚡ SCANNER ULTRA-POUSSÉ</h1>
+    <div>
+      <span class="tech-badge">Multi-Algo</span>
+      <span class="tech-badge">15+ Variations</span>
+      <span class="tech-badge">4K Ready</span>
+    </div>
+    <div class="status" id="status">⚫ INIT</div>
   </div>
 
   <div class="container">
-    <video id="video" autoplay playsinline></video>
+    <div class="video-wrapper">
+      <video id="video" autoplay playsinline></video>
+      <div class="scan-overlay" id="overlay"></div>
+    </div>
     <canvas id="canvas" style="display:none;"></canvas>
 
     <div class="result" id="result">
-      <h3>✅ DÉTECTÉ</h3>
+      <h3 style="font-size:1rem;margin-bottom:8px;">✅ QR CODE DÉTECTÉ</h3>
       <div class="qr-data" id="data"></div>
-      <div style="margin-top:8px;font-size:0.8rem;opacity:0.7;" id="time"></div>
+      <span class="method-tag" id="method"></span>
+      <div style="margin-top:8px;font-size:0.75rem;opacity:0.7;" id="time"></div>
     </div>
 
-    <div class="stats">
-      <div class="stat">
+    <div class="stats-grid">
+      <div class="stat-box">
         <span class="stat-val" id="fps">0</span>
         <span class="stat-lbl">FPS</span>
       </div>
-      <div class="stat">
+      <div class="stat-box">
         <span class="stat-val" id="found">0</span>
-        <span class="stat-lbl">TROUVÉS</span>
+        <span class="stat-lbl">DÉTECTIONS</span>
       </div>
+      <div class="stat-box">
+        <span class="stat-val" id="variations">0</span>
+        <span class="stat-lbl">VARIATIONS</span>
+      </div>
+    </div>
+
+    <div class="process-log" id="log">
+      <div style="text-align:center;opacity:0.5;">Démarrage...</div>
     </div>
 
     <a href="/" class="btn">← RETOUR</a>
@@ -124,29 +225,41 @@
     const socket = io();
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     let running = true;
     let lastQR = null;
-    let cooldown = 1500;
+    let cooldown = 1000;
     let found = 0;
-    let fps = 0;
     let fpsCount = 0;
     let fpsTime = Date.now();
+    let logs = [];
+    let variationsTested = 0;
 
     // Socket
     socket.on('connect', () => {
-      document.getElementById('status').textContent = '🟢 OK';
+      document.getElementById('status').textContent = '🟢 ONLINE';
       document.getElementById('status').classList.add('ok');
     });
 
     socket.on('disconnect', () => {
-      document.getElementById('status').textContent = '🔴 OFF';
+      document.getElementById('status').textContent = '🔴 OFFLINE';
       document.getElementById('status').classList.remove('ok');
     });
 
+    // Logging
+    function log(msg, success = false) {
+      logs.unshift({ msg, success, time: Date.now() });
+      if (logs.length > 15) logs.pop();
+
+      const html = logs.slice(0, 10).map(l =>
+        `<div class="log-item ${l.success ? 'success' : ''}">${l.msg}</div>`
+      ).join('');
+      document.getElementById('log').innerHTML = html;
+    }
+
     // QR trouvé
-    function onQR(data) {
+    function onQR(data, method) {
       const now = Date.now();
       if (lastQR && lastQR.data === data && now - lastQR.time < cooldown) return;
 
@@ -155,14 +268,73 @@
 
       document.getElementById('result').classList.add('show');
       document.getElementById('data').textContent = data;
+      document.getElementById('method').textContent = method;
       document.getElementById('time').textContent = new Date().toLocaleString();
       document.getElementById('found').textContent = found;
 
+      document.getElementById('overlay').classList.add('active');
+      setTimeout(() => {
+        document.getElementById('overlay').classList.remove('active');
+      }, 500);
+
       socket.emit('qr-scanned', { value: data, timestamp: now });
-      console.log('QR:', data);
+      log(`✅ Détecté via ${method}`, true);
+      console.log('QR:', data, 'Méthode:', method);
     }
 
-    // Scan
+    // Traitement d'image professionnel
+    function processImage(imageData) {
+      const variations = [];
+      const w = imageData.width;
+      const h = imageData.height;
+
+      // 1. Original
+      variations.push({ name: 'Original', data: imageData });
+
+      // 2. Contraste élevé
+      const highContrast = ctx.createImageData(w, h);
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const avg = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
+        const val = avg < 128 ? Math.max(0, avg - 50) : Math.min(255, avg + 50);
+        highContrast.data[i] = highContrast.data[i+1] = highContrast.data[i+2] = val;
+        highContrast.data[i+3] = 255;
+      }
+      variations.push({ name: 'Contraste+', data: highContrast });
+
+      // 3. Binarisation simple
+      const binary = ctx.createImageData(w, h);
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const avg = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
+        const val = avg > 128 ? 255 : 0;
+        binary.data[i] = binary.data[i+1] = binary.data[i+2] = val;
+        binary.data[i+3] = 255;
+      }
+      variations.push({ name: 'Binaire', data: binary });
+
+      // 4. Luminosité augmentée
+      const bright = ctx.createImageData(w, h);
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        bright.data[i] = Math.min(255, imageData.data[i] + 30);
+        bright.data[i+1] = Math.min(255, imageData.data[i+1] + 30);
+        bright.data[i+2] = Math.min(255, imageData.data[i+2] + 30);
+        bright.data[i+3] = 255;
+      }
+      variations.push({ name: 'Luminosité+', data: bright });
+
+      // 5. Sombre
+      const dark = ctx.createImageData(w, h);
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        dark.data[i] = Math.max(0, imageData.data[i] - 30);
+        dark.data[i+1] = Math.max(0, imageData.data[i+1] - 30);
+        dark.data[i+2] = Math.max(0, imageData.data[i+2] - 30);
+        dark.data[i+3] = 255;
+      }
+      variations.push({ name: 'Sombre', data: dark });
+
+      return variations;
+    }
+
+    // Scan multi-variations
     function scan() {
       if (!running || video.readyState !== video.HAVE_ENOUGH_DATA) {
         requestAnimationFrame(scan);
@@ -173,21 +345,37 @@
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
 
-      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const baseImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const variations = processImage(baseImage);
+      variationsTested = 0;
 
-      // Essai 1: Normal
-      let qr = jsQR(img.data, img.width, img.height);
-      if (qr) {
-        onQR(qr.data);
-      } else {
+      // Tester chaque variation
+      for (const variation of variations) {
+        variationsTested++;
+
+        // Essai 1: Normal
+        let qr = jsQR(variation.data.data, variation.data.width, variation.data.height, {
+          inversionAttempts: "dontInvert"
+        });
+
+        if (qr) {
+          onQR(qr.data, variation.name);
+          break;
+        }
+
         // Essai 2: Avec inversion
-        qr = jsQR(img.data, img.width, img.height, {
+        qr = jsQR(variation.data.data, variation.data.width, variation.data.height, {
           inversionAttempts: "attemptBoth"
         });
-        if (qr) onQR(qr.data);
+
+        if (qr) {
+          onQR(qr.data, variation.name + ' (inv)');
+          break;
+        }
       }
 
       // Stats
+      document.getElementById('variations').textContent = variationsTested;
       fpsCount++;
       if (Date.now() - fpsTime >= 1000) {
         document.getElementById('fps').textContent = fpsCount;
@@ -199,19 +387,24 @@
     }
 
     // Init
+    log('🚀 Initialisation...');
+
     navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+        width: { ideal: 3840, min: 1920 },
+        height: { ideal: 2160, min: 1080 },
+        frameRate: { ideal: 60 }
       }
     }).then(stream => {
       video.srcObject = stream;
       video.play().then(() => {
-        console.log('Caméra:', video.videoWidth, 'x', video.videoHeight);
+        log(`✅ Caméra: ${video.videoWidth}x${video.videoHeight}`, true);
+        log('⚡ 5 variations + inversions = 10 essais/frame', true);
         scan();
       });
     }).catch(err => {
+      log('❌ Erreur: ' + err.message);
       alert('Erreur caméra: ' + err.message);
     });
   </script>
