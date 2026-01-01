@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scanner - QRCode Live Relay</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * {
@@ -172,9 +171,6 @@
     let html5QrCode;
     let isScanning = false;
     let scanTimeout = null;
-    let zxingCodeReader = null;
-    let videoElement = null;
-    let zxingInterval = null;
 
     // Connexion WebSocket
     socket.on('connect', () => {
@@ -227,114 +223,42 @@
       // Ignorer les erreurs normales de scan
     }
 
-    // Fonction pour démarrer ZXing comme détection alternative
-    function startZXingBackup() {
-      try {
-        zxingCodeReader = new ZXing.BrowserQRCodeReader();
-
-        // Attendre que la vidéo soit disponible
-        setTimeout(() => {
-          videoElement = document.querySelector('#reader video');
-
-          if (!videoElement) {
-            console.warn('⚠️ Vidéo non trouvée pour ZXing');
-            return;
-          }
-
-          console.log('✅ ZXing backup activé');
-
-          // Scanner avec ZXing toutes les 500ms
-          zxingInterval = setInterval(() => {
-            if (isScanning || !videoElement) return;
-
-            zxingCodeReader.decodeFromVideoElement(videoElement)
-              .then(result => {
-                if (result && result.text && !isScanning) {
-                  console.log('🎯 ZXing a détecté un QR code!');
-                  onScanSuccess(result.text, result);
-                }
-              })
-              .catch(err => {
-                // Ignorer les erreurs, c'est normal si aucun QR n'est visible
-              });
-          }, 500);
-        }, 2000); // Attendre 2s que html5-qrcode initialise la vidéo
-
-      } catch (err) {
-        console.error('❌ Erreur ZXing:', err);
-      }
-    }
-
-    // Configuration améliorée pour les petits QR codes
+    // Démarrer le scanner - version simple et robuste
     html5QrCode = new Html5Qrcode("reader");
+
     const config = {
-      fps: 20, // Augmentation du FPS pour plus de réactivité
-      qrbox: function(viewfinderWidth, viewfinderHeight) {
-        // Zone de scan adaptative (80% de l'écran)
-        let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-        let qrboxSize = Math.floor(minEdge * 0.8);
-        return {
-          width: qrboxSize,
-          height: qrboxSize
-        };
-      },
-      aspectRatio: 1.0
+      fps: 10,
+      qrbox: { width: 250, height: 250 }
     };
 
-    // Fonction pour démarrer le scanner avec fallback
-    function startScanner() {
-      Html5Qrcode.getCameras().then(cameras => {
-        if (cameras && cameras.length) {
-          // Essayer d'abord avec haute résolution
-          const highResConfig = {
-            facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          };
+    Html5Qrcode.getCameras().then(cameras => {
+      if (cameras && cameras.length) {
+        const cameraId = cameras[0].id;
 
-          html5QrCode.start(
-            highResConfig,
-            config,
-            onScanSuccess,
-            onScanError
-          ).then(() => {
-            document.getElementById('scanning-indicator').style.display = 'block';
-            console.log('✅ Scanner démarré avec haute résolution');
-            startZXingBackup();
-          }).catch(err => {
-            // Fallback: essayer avec contraintes basiques
-            console.warn('⚠️ Haute résolution échouée, fallback...');
-            html5QrCode.start(
-              { facingMode: "environment" },
-              config,
-              onScanSuccess,
-              onScanError
-            ).then(() => {
-              document.getElementById('scanning-indicator').style.display = 'block';
-              console.log('✅ Scanner démarré (résolution standard)');
-              startZXingBackup();
-            }).catch(err2 => {
-              console.error('❌ Erreur caméra:', err2);
-              alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
-            });
-          });
-        }
-      }).catch(err => {
-        console.error('❌ Erreur caméra:', err);
-        alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
-      });
-    }
-
-    // Démarrer le scanner
-    startScanner();
+        html5QrCode.start(
+          cameraId,
+          config,
+          onScanSuccess,
+          onScanError
+        ).then(() => {
+          document.getElementById('scanning-indicator').style.display = 'block';
+          console.log('✅ Scanner démarré');
+        }).catch(err => {
+          console.error('❌ Erreur caméra:', err);
+          alert('Impossible d\'accéder à la caméra: ' + err);
+        });
+      } else {
+        alert('Aucune caméra trouvée');
+      }
+    }).catch(err => {
+      console.error('❌ Erreur de détection caméra:', err);
+      alert('Impossible de détecter les caméras: ' + err);
+    });
 
     // Arrêter le scanner à la fermeture
     window.addEventListener('beforeunload', () => {
       if (html5QrCode) {
         html5QrCode.stop();
-      }
-      if (zxingInterval) {
-        clearInterval(zxingInterval);
       }
     });
   </script>
