@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scanner ULTIMATE - Niveau Industriel</title>
-  <script type="module" src="https://unpkg.com/@zxing/browser@latest/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/image-processor.js"></script>
@@ -279,7 +278,6 @@
     let lastFpsTime = Date.now();
     let detectionCount = 0;
     let processingLog = [];
-    let codeReader = null;
 
     // WebSocket
     socket.on('connect', () => {
@@ -338,7 +336,7 @@
       }, 1000);
     }
 
-    // Détection multi-algorithmes
+    // Détection multi-méthodes avec traitement d'image avancé
     async function detectQRCode(imageData) {
       // 1. Essayer jsQR sur l'image originale
       let code = jsQR(imageData.data, imageData.width, imageData.height, {
@@ -346,41 +344,33 @@
       });
 
       if (code) {
-        return { data: code.data, method: 'jsQR (original)' };
+        return { data: code.data, method: 'Original' };
       }
 
-      // 2. Essayer ZXing sur l'image originale
-      try {
-        const result = await codeReader.decodeFromImageData(imageData);
-        if (result) {
-          return { data: result.text, method: 'ZXing WASM (original)' };
-        }
-      } catch (e) {
-        // Pas de QR trouvé
-      }
-
-      // 3. Traitement d'image avancé avec multiples variations
-      addLog('🔄 Traitement d\'image avancé...');
+      // 2. Traitement d'image avancé avec 7 variations
+      addLog('🔄 Traitement multi-passes...');
       const variations = ImageProcessor.processImage(imageData);
 
+      // Essayer chaque variation
       for (const variation of variations) {
-        // Essayer jsQR
         code = jsQR(variation.data.data, variation.data.width, variation.data.height, {
           inversionAttempts: "dontInvert",
         });
 
         if (code) {
-          return { data: code.data, method: `jsQR (${variation.name})` };
+          addLog(`✅ Détecté via ${variation.name}`, true);
+          return { data: code.data, method: variation.name };
         }
+      }
 
-        // Essayer ZXing
-        try {
-          const result = await codeReader.decodeFromImageData(variation.data);
-          if (result) {
-            return { data: result.text, method: `ZXing (${variation.name})` };
-          }
-        } catch (e) {
-          // Continuer
+      // 3. Essayer avec inversion automatique en dernier recours
+      for (const variation of [imageData, ...variations.map(v => v.data)]) {
+        code = jsQR(variation.data, variation.width, variation.height, {
+          inversionAttempts: "attemptBoth",
+        });
+
+        if (code) {
+          return { data: code.data, method: 'Inversion' };
         }
       }
 
@@ -427,12 +417,7 @@
     // Initialisation
     async function init() {
       try {
-        addLog('🚀 Initialisation ZXing WebAssembly...');
-
-        // Initialiser ZXing
-        const { BrowserMultiFormatReader } = window.ZXingBrowser;
-        codeReader = new BrowserMultiFormatReader();
-
+        addLog('🚀 Initialisation scanner...');
         addLog('📹 Démarrage caméra haute résolution...');
 
         // Démarrer la caméra avec résolution maximale
