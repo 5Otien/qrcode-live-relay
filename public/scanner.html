@@ -281,36 +281,52 @@
       aspectRatio: 1.0
     };
 
-    // Contraintes vidéo pour haute résolution
-    const videoConstraints = {
-      facingMode: "environment",
-      advanced: [
-        { width: { min: 1280, ideal: 1920 } },
-        { height: { min: 720, ideal: 1080 } },
-        { focusMode: "continuous" },
-        { zoom: { min: 1.0, max: 3.0 } }
-      ]
-    };
+    // Fonction pour démarrer le scanner avec fallback
+    function startScanner() {
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+          // Essayer d'abord avec haute résolution
+          const highResConfig = {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          };
 
-    Html5Qrcode.getCameras().then(cameras => {
-      if (cameras && cameras.length) {
-        html5QrCode.start(
-          videoConstraints,
-          config,
-          onScanSuccess,
-          onScanError
-        ).then(() => {
-          document.getElementById('scanning-indicator').style.display = 'block';
-          console.log('✅ Scanner démarré avec haute résolution');
+          html5QrCode.start(
+            highResConfig,
+            config,
+            onScanSuccess,
+            onScanError
+          ).then(() => {
+            document.getElementById('scanning-indicator').style.display = 'block';
+            console.log('✅ Scanner démarré avec haute résolution');
+            startZXingBackup();
+          }).catch(err => {
+            // Fallback: essayer avec contraintes basiques
+            console.warn('⚠️ Haute résolution échouée, fallback...');
+            html5QrCode.start(
+              { facingMode: "environment" },
+              config,
+              onScanSuccess,
+              onScanError
+            ).then(() => {
+              document.getElementById('scanning-indicator').style.display = 'block';
+              console.log('✅ Scanner démarré (résolution standard)');
+              startZXingBackup();
+            }).catch(err2 => {
+              console.error('❌ Erreur caméra:', err2);
+              alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
+            });
+          });
+        }
+      }).catch(err => {
+        console.error('❌ Erreur caméra:', err);
+        alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
+      });
+    }
 
-          // Démarrer ZXing en backup pour les petits QR codes
-          startZXingBackup();
-        });
-      }
-    }).catch(err => {
-      console.error('❌ Erreur caméra:', err);
-      alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
-    });
+    // Démarrer le scanner
+    startScanner();
 
     // Arrêter le scanner à la fermeture
     window.addEventListener('beforeunload', () => {

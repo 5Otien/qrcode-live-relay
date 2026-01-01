@@ -1,0 +1,17 @@
+# Scanner QR Code Python - Dépendances
+# Installation: pip install -r requirements.txt
+
+# Vision par ordinateur
+opencv-python>=4.8.0
+
+# Détection de codes-barres et QR codes (très robuste)
+pyzbar>=0.1.9
+
+# Communication WebSocket avec le serveur Node.js
+python-socketio[client]>=5.10.0
+
+# Traitement d'image
+numpy>=1.24.0
+
+# Pour les notifications système (optionnel)
+plyer>=2.1.0
